@@ -16,6 +16,7 @@ import (
 	"errors"
 	"net/url"
 	"sync"
+	"time"
 
 	libtrace "github.com/billziss-gh/golib/trace"
 )
@@ -32,6 +33,8 @@ type Client interface {
 	GetRepositories(owner Owner) ([]Repository, error)
 	GetRepository(owner Owner, name string, acquire bool) (Repository, error)
 	ReleaseRepository(repository Repository)
+	Start(timeToLive time.Duration)
+	Stop()
 }
 
 type Owner interface {

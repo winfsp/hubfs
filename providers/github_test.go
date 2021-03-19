@@ -16,6 +16,7 @@ import (
 	"fmt"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/billziss-gh/golib/keyring"
 	libtrace "github.com/billziss-gh/golib/trace"
@@ -108,6 +109,50 @@ func TestGetRepository(t *testing.T) {
 	if repository.Name() != repositoryName {
 		t.Error()
 	}
+}
+
+func testExpiration(t *testing.T) {
+	client.Start(1 * time.Second)
+	defer client.Stop()
+
+	owner, err := client.GetOwner(ownerName, false)
+	if nil != err {
+		t.Error(err)
+	}
+	if owner.Name() != ownerName {
+		t.Error()
+	}
+
+	repository, err := client.GetRepository(owner, repositoryName, false)
+	if nil != err {
+		t.Error(err)
+	}
+	if repository.Name() != repositoryName {
+		t.Error()
+	}
+
+	time.Sleep(2 * time.Second)
+
+	owner, err = client.GetOwner(ownerName, false)
+	if nil != err {
+		t.Error(err)
+	}
+	if owner.Name() != ownerName {
+		t.Error()
+	}
+
+	repository, err = client.GetRepository(owner, repositoryName, false)
+	if nil != err {
+		t.Error(err)
+	}
+	if repository.Name() != repositoryName {
+		t.Error()
+	}
+}
+
+func TestExpiration(t *testing.T) {
+	testExpiration(t)
+	testExpiration(t)
 }
 
 func TestMain(m *testing.M) {

@@ -47,9 +47,11 @@ type githubClient struct {
 	baseurl    string
 	token      string
 	login      string
-	ttl        time.Duration
 	lrulist    cache.MapItem
 	owners     *cache.Map
+	ttl        time.Duration
+	stopC      chan bool
+	stopW      *sync.WaitGroup
 }
 
 type githubOwner struct {
@@ -320,6 +322,53 @@ func (client *githubClient) ReleaseRepository(repository Repository) {
 	client.Lock()
 	repository.(*githubRepository).cachedItem.touchCachedItem(client.ttl, -1)
 	client.Unlock()
+}
+
+func (client *githubClient) tick() {
+	defer client.stopW.Done()
+	ticker := time.NewTicker(1 * time.Second)
+	for {
+		select {
+		case <-ticker.C:
+			currentTime := time.Now()
+			client.Lock()
+			client.lrulist.Expire(func(list, item *cache.MapItem) bool {
+				switch obj := item.Value.(type) {
+				case *githubOwner:
+					return obj.cachedItem.expireCachedItem(list, client.ttl, currentTime, func() {
+						client.owners.Delete(obj.FName)
+					})
+				case *githubRepository:
+					return obj.cachedItem.expireCachedItem(list, client.ttl, currentTime, func() {
+						// ...
+					})
+				default:
+					panic("unexpected cached item type")
+				}
+			})
+			client.Unlock()
+		case <-client.stopC:
+			ticker.Stop()
+			return
+		}
+	}
+}
+
+func (client *githubClient) Start(timeToLive time.Duration) {
+	client.ttl = timeToLive
+	client.stopC = make(chan bool, 1)
+	client.stopW = &sync.WaitGroup{}
+	client.stopW.Add(1)
+	go client.tick()
+}
+
+func (client *githubClient) Stop() {
+	client.stopC <- true
+	client.stopW.Wait()
+	close(client.stopC)
+	client.ttl = 0
+	client.stopC = nil
+	client.stopW = nil
 }
 
 func (owner *githubOwner) Name() string {
