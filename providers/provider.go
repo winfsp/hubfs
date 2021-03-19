@@ -13,30 +13,36 @@
 package providers
 
 import (
+	"errors"
 	"net/url"
 	"sync"
+
+	libtrace "github.com/billziss-gh/golib/trace"
 )
-
-type Owner struct {
-	Name string
-}
-
-type Repository struct {
-	OwnerName string
-	Name      string
-}
-
-type Client interface {
-	GetOwners() ([]*Owner, error)
-	GetOwner(name string) (*Owner, error)
-	GetRepositories(owner *Owner) ([]*Repository, error)
-	GetRepository(owner *Owner, name string) (*Repository, error)
-}
 
 type Provider interface {
 	Auth() (string, error)
 	NewClient(token string) (Client, error)
 }
+
+type Client interface {
+	GetOwners() ([]Owner, error)
+	GetOwner(name string, acquire bool) (Owner, error)
+	ReleaseOwner(owner Owner)
+	GetRepositories(owner Owner) ([]Repository, error)
+	GetRepository(owner Owner, name string, acquire bool) (Repository, error)
+	ReleaseRepository(repository Repository)
+}
+
+type Owner interface {
+	Name() string
+}
+
+type Repository interface {
+	Name() string
+}
+
+var ErrNotFound = errors.New("not found")
 
 var lock sync.Mutex
 var providers = make(map[string]Provider)
@@ -49,14 +55,18 @@ func GetProviderName(uri *url.URL) string {
 	return u.String()
 }
 
-func GetProvider(uri string) Provider {
+func GetProvider(name string) Provider {
 	lock.Lock()
 	defer lock.Unlock()
-	return providers[uri]
+	return providers[name]
 }
 
-func RegisterProvider(uri string, provider Provider) {
+func RegisterProvider(name string, provider Provider) {
 	lock.Lock()
 	defer lock.Unlock()
-	providers[uri] = provider
+	providers[name] = provider
+}
+
+func trace(vals ...interface{}) func(vals ...interface{}) {
+	return libtrace.Trace(1, "", vals...)
 }
