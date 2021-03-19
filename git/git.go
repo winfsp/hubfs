@@ -23,9 +23,9 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/format/packfile"
 	"github.com/go-git/go-git/v5/plumbing/protocol/packp"
 	"github.com/go-git/go-git/v5/plumbing/protocol/packp/sideband"
+	"github.com/go-git/go-git/v5/plumbing/storer"
 	"github.com/go-git/go-git/v5/plumbing/transport"
-	githttp "github.com/go-git/go-git/v5/plumbing/transport/http"
-	"github.com/go-git/go-git/v5/storage/memory"
+	"github.com/go-git/go-git/v5/plumbing/transport/http"
 )
 
 type Type int
@@ -59,7 +59,7 @@ func (client *Client) OpenRepository(repo string) (res *Repository, err error) {
 	endpoint := *client.endpoint
 	endpoint.Path = path.Join(endpoint.Path, repo)
 
-	auth := &githttp.BasicAuth{
+	auth := &http.BasicAuth{
 		Username: client.token,
 		Password: "x-oauth-basic",
 	}
@@ -109,6 +109,54 @@ func (repository *Repository) GetRefs() (res []*Ref, err error) {
 	return res, nil
 }
 
+type storemap map[plumbing.Hash]plumbing.EncodedObject
+
+func (m storemap) NewEncodedObject() plumbing.EncodedObject {
+	return &plumbing.MemoryObject{}
+}
+
+func (m storemap) SetEncodedObject(obj plumbing.EncodedObject) (plumbing.Hash, error) {
+	hash := obj.Hash()
+	m[hash] = obj
+	return hash, nil
+}
+
+func (m storemap) EncodedObject(typ plumbing.ObjectType, hash plumbing.Hash) (
+	plumbing.EncodedObject, error) {
+	obj, ok := m[hash]
+	if !ok || (plumbing.AnyObject != typ && obj.Type() != typ) {
+		return nil, plumbing.ErrObjectNotFound
+	}
+
+	return obj, nil
+}
+
+func (m storemap) IterEncodedObjects(typ plumbing.ObjectType) (storer.EncodedObjectIter, error) {
+	lst := make([]plumbing.EncodedObject, 0, len(m))
+	for _, obj := range m {
+		if plumbing.AnyObject == typ || obj.Type() == typ {
+			lst = append(lst, obj)
+		}
+	}
+	return storer.NewEncodedObjectSliceIter(lst), nil
+}
+
+func (m storemap) HasEncodedObject(hash plumbing.Hash) error {
+	_, ok := m[hash]
+	if !ok {
+		return plumbing.ErrObjectNotFound
+	}
+	return nil
+}
+
+func (m storemap) EncodedObjectSize(hash plumbing.Hash) (int64, error) {
+	obj, ok := m[hash]
+	if !ok {
+		return 0, plumbing.ErrObjectNotFound
+	}
+	return obj.Size(), nil
+}
+
 type observer struct {
 	fn  func(hash string, typ Type, content []byte) error
 	typ plumbing.ObjectType
@@ -117,10 +165,12 @@ type observer struct {
 func (obs *observer) OnHeader(count uint32) error {
 	return nil
 }
+
 func (obs *observer) OnInflatedObjectHeader(typ plumbing.ObjectType, objSize int64, pos int64) error {
 	obs.typ = typ
 	return nil
 }
+
 func (obs *observer) OnInflatedObjectContent(h plumbing.Hash, pos int64, crc uint32, content []byte) error {
 	switch obs.typ {
 	case plumbing.CommitObject, plumbing.TreeObject, plumbing.BlobObject, plumbing.TagObject:
@@ -129,6 +179,7 @@ func (obs *observer) OnInflatedObjectContent(h plumbing.Hash, pos int64, crc uin
 		return nil
 	}
 }
+
 func (obs *observer) OnFooter(h plumbing.Hash) error {
 	return nil
 }
@@ -168,7 +219,7 @@ func (repository *Repository) FetchObjects(wants []string,
 	}
 
 	scn := packfile.NewScanner(reader)
-	stg := memory.NewStorage()
+	stg := storemap{}
 	obs := &observer{fn: fn}
 	parser, err := packfile.NewParserWithStorage(scn, stg, obs)
 	if nil != err {
@@ -190,7 +241,7 @@ func NewClient(remote string, token string) (*Client, error) {
 	}
 
 	return &Client{
-		transport: githttp.NewClient(httputil.DefaultClient),
+		transport: http.NewClient(httputil.DefaultClient),
 		endpoint:  ept,
 		token:     token,
 	}, nil
