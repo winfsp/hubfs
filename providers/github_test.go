@@ -22,7 +22,7 @@ import (
 )
 
 const ownerName = "billziss-gh"
-const repositoryName = "winfsp"
+const repositoryName = "hubfs"
 
 var client Client
 

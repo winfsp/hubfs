@@ -46,6 +46,7 @@ type githubClient struct {
 	httpClient *http.Client
 	baseurl    string
 	token      string
+	login      string
 	ttl        time.Duration
 	lrulist    cache.MapItem
 	owners     *cache.Map
@@ -85,6 +86,23 @@ func (provider *githubProvider) NewClient(token string) (Client, error) {
 		token:      token,
 	}
 	client.lrulist.Empty()
+
+	rsp, err := client.sendrecv("/user")
+	if nil != err {
+		return nil, err
+	}
+	defer rsp.Body.Close()
+
+	var content struct {
+		FName string `json:"login"`
+	}
+	err = json.NewDecoder(rsp.Body).Decode(&content)
+	if nil != err {
+		return nil, err
+	}
+
+	client.login = content.FName
+
 	return client, nil
 }
 
@@ -150,7 +168,13 @@ func (client *githubClient) getRepositoryPage(path string) ([]*githubRepository,
 
 func (client *githubClient) getRepositories(owner string) (res []*githubRepository, err error) {
 	defer trace(owner)(&err)
-	path := fmt.Sprintf("/users/%s/repos?type=owner&per_page=100", owner)
+
+	var path string
+	if client.login == owner {
+		path = "/user/repos?visibility=all&affiliation=owner,organization_member&per_page=100"
+	} else {
+		path = fmt.Sprintf("/users/%s/repos?type=owner&per_page=100", owner)
+	}
 
 	res = make([]*githubRepository, 0)
 	for page := 1; ; page++ {
