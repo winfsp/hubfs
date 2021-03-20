@@ -18,19 +18,18 @@ import (
 	"testing"
 
 	"github.com/billziss-gh/golib/keyring"
-	libtrace "github.com/billziss-gh/golib/trace"
 )
 
-const repositoryName = "billziss-gh/hubfs"
+const remote = "https://github.com/billziss-gh/hubfs"
 const refName = "refs/heads/master"
 
-const hash0 = "a06526668730e385e3eccecafce0840f3e63c1fb"
-const hash1 = "9bcabcfe97184ee68a8bb98d556b6aa726c119f8"
+const hash0 = "90f898ae1f8d3c976f9224d92e3b08d7813e961e"
+const hash1 = "609d3b892764952ef69676e653e06b2ca904be18"
 
-var client *Client
+var token string
 
 func TestGetRefs(t *testing.T) {
-	repository, err := client.OpenRepository(repositoryName)
+	repository, err := OpenRepository(remote, token)
 	if nil != err {
 		t.Error(err)
 	}
@@ -41,8 +40,8 @@ func TestGetRefs(t *testing.T) {
 		t.Error(err)
 	}
 	found := false
-	for _, e := range refs {
-		if e.Name == refName {
+	for n := range refs {
+		if n == refName {
 			found = true
 			break
 		}
@@ -56,8 +55,8 @@ func TestGetRefs(t *testing.T) {
 		t.Error(err)
 	}
 	found = false
-	for _, e := range refs {
-		if e.Name == refName {
+	for n := range refs {
+		if n == refName {
 			found = true
 			break
 		}
@@ -68,7 +67,7 @@ func TestGetRefs(t *testing.T) {
 }
 
 func TestFetchObjects(t *testing.T) {
-	repository, err := client.OpenRepository(repositoryName)
+	repository, err := OpenRepository(remote, token)
 	if nil != err {
 		t.Error(err)
 	}
@@ -80,9 +79,20 @@ func TestFetchObjects(t *testing.T) {
 	}
 	found := false
 	err = repository.FetchObjects(wants,
-		func(hash string, typ Type, content []byte) error {
-			if hash0 == hash || hash1 == hash {
+		func(hash string, content []byte) error {
+			if hash0 == hash {
 				found = true
+				_, err := DecodeCommit(content)
+				if nil != err {
+					return err
+				}
+			}
+			if hash1 == hash {
+				found = true
+				_, err := DecodeTree(content)
+				if nil != err {
+					return err
+				}
 			}
 			return nil
 		})
@@ -98,9 +108,13 @@ func TestFetchObjects(t *testing.T) {
 	}
 	found = false
 	err = repository.FetchObjects(wants,
-		func(hash string, typ Type, content []byte) error {
+		func(hash string, content []byte) error {
 			if hash0 == hash {
 				found = true
+				_, err := DecodeCommit(content)
+				if nil != err {
+					return err
+				}
 			}
 			return nil
 		})
@@ -116,9 +130,13 @@ func TestFetchObjects(t *testing.T) {
 	}
 	found = false
 	err = repository.FetchObjects(wants,
-		func(hash string, typ Type, content []byte) error {
+		func(hash string, content []byte) error {
 			if hash1 == hash {
 				found = true
+				_, err := DecodeTree(content)
+				if nil != err {
+					return err
+				}
 			}
 			return nil
 		})
@@ -131,15 +149,10 @@ func TestFetchObjects(t *testing.T) {
 }
 
 func TestMain(m *testing.M) {
-	libtrace.Verbose = true
-	libtrace.Pattern = "github.com/billziss-gh/hubfs/*"
-
-	token, err := keyring.Get("hubfs", "https://github.com")
-	if nil == err {
-		client, err = NewClient("https://github.com", token)
-	}
+	var err error
+	token, err = keyring.Get("hubfs", "https://github.com")
 	if nil != err {
-		fmt.Fprintf(os.Stderr, "unable to create git client: %v\n", err)
+		fmt.Fprintf(os.Stderr, "unable to get auth token: %v\n", err)
 		os.Exit(1)
 	}
 

@@ -15,12 +15,12 @@ package git
 import (
 	"context"
 	"io"
-	"path"
+	"time"
 
-	libtrace "github.com/billziss-gh/golib/trace"
 	"github.com/billziss-gh/hubfs/httputil"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/format/packfile"
+	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/go-git/go-git/v5/plumbing/protocol/packp"
 	"github.com/go-git/go-git/v5/plumbing/protocol/packp/sideband"
 	"github.com/go-git/go-git/v5/plumbing/storer"
@@ -28,43 +28,45 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/transport/http"
 )
 
-type Type int
-
-const (
-	Commit Type = 1
-	Tree   Type = 2
-	Blob   Type = 3
-	Tag    Type = 4
-)
-
-type Client struct {
-	transport transport.Transport
-	endpoint  *transport.Endpoint
-	token     string
-}
-
 type Repository struct {
 	session transport.UploadPackSession
 	advrefs *packp.AdvRefs
 }
 
-type Ref struct {
+type Signature struct {
+	Name  string
+	Email string
+	Time  time.Time
+}
+
+type Commit struct {
+	Author    Signature
+	Committer Signature
+	TreeHash  string
+}
+
+type TreeEntry struct {
 	Name string
+	Mode uint32
 	Hash string
 }
 
-func (client *Client) OpenRepository(repo string) (res *Repository, err error) {
-	defer trace(repo)(&err)
-
-	endpoint := *client.endpoint
-	endpoint.Path = path.Join(endpoint.Path, repo)
-
-	auth := &http.BasicAuth{
-		Username: client.token,
-		Password: "x-oauth-basic",
+func OpenRepository(remote string, token string) (res *Repository, err error) {
+	endpoint, err := transport.NewEndpoint(remote)
+	if nil != err {
+		return nil, err
 	}
 
-	session, err := client.transport.NewUploadPackSession(&endpoint, auth)
+	var auth transport.AuthMethod
+	if "" != token {
+		auth = &http.BasicAuth{
+			Username: token,
+			Password: "x-oauth-basic",
+		}
+	}
+
+	client := http.NewClient(httputil.DefaultClient)
+	session, err := client.NewUploadPackSession(endpoint, auth)
 	if nil != err {
 		return nil, err
 	}
@@ -82,28 +84,18 @@ func (client *Client) OpenRepository(repo string) (res *Repository, err error) {
 }
 
 func (repository *Repository) Close() (err error) {
-	defer trace()(&err)
-
 	return repository.session.Close()
 }
 
-func (repository *Repository) GetRefs() (res []*Ref, err error) {
-	defer trace()(&err)
-
+func (repository *Repository) GetRefs() (res map[string]string, err error) {
 	stg, err := repository.advrefs.AllReferences()
 	if nil != err {
 		return nil, err
 	}
 
-	res = make([]*Ref, len(stg))
-	i := 0
+	res = make(map[string]string, len(stg))
 	for n, r := range stg {
-		ref := &Ref{
-			Name: string(n),
-			Hash: r.Hash().String(),
-		}
-		res[i] = ref
-		i++
+		res[string(n)] = r.Hash().String()
 	}
 
 	return res, nil
@@ -158,8 +150,7 @@ func (m storemap) EncodedObjectSize(hash plumbing.Hash) (int64, error) {
 }
 
 type observer struct {
-	fn  func(hash string, typ Type, content []byte) error
-	typ plumbing.ObjectType
+	fn func(hash string, content []byte) error
 }
 
 func (obs *observer) OnHeader(count uint32) error {
@@ -167,17 +158,11 @@ func (obs *observer) OnHeader(count uint32) error {
 }
 
 func (obs *observer) OnInflatedObjectHeader(typ plumbing.ObjectType, objSize int64, pos int64) error {
-	obs.typ = typ
 	return nil
 }
 
 func (obs *observer) OnInflatedObjectContent(h plumbing.Hash, pos int64, crc uint32, content []byte) error {
-	switch obs.typ {
-	case plumbing.CommitObject, plumbing.TreeObject, plumbing.BlobObject, plumbing.TagObject:
-		return obs.fn(h.String(), Type(obs.typ), content)
-	default:
-		return nil
-	}
+	return obs.fn(h.String(), content)
 }
 
 func (obs *observer) OnFooter(h plumbing.Hash) error {
@@ -185,9 +170,7 @@ func (obs *observer) OnFooter(h plumbing.Hash) error {
 }
 
 func (repository *Repository) FetchObjects(wants []string,
-	fn func(hash string, typ Type, content []byte) error) (err error) {
-	defer trace(len(wants))(&err)
-
+	fn func(hash string, content []byte) error) (err error) {
 	req := packp.NewUploadPackRequestFromCapabilities(repository.advrefs.Capabilities)
 
 	if nil == req.Capabilities.Set("shallow") {
@@ -234,19 +217,47 @@ func (repository *Repository) FetchObjects(wants []string,
 	return nil
 }
 
-func NewClient(remote string, token string) (*Client, error) {
-	ept, err := transport.NewEndpoint(remote)
+func DecodeCommit(content []byte) (res *Commit, err error) {
+	obj := &plumbing.MemoryObject{}
+	obj.SetType(plumbing.CommitObject)
+	obj.Write(content)
+	c := &object.Commit{}
+	err = c.Decode(obj)
 	if nil != err {
-		return nil, err
+		return
 	}
-
-	return &Client{
-		transport: http.NewClient(httputil.DefaultClient),
-		endpoint:  ept,
-		token:     token,
-	}, nil
+	res = &Commit{
+		Author: Signature{
+			Name:  c.Author.Name,
+			Email: c.Author.Email,
+			Time:  c.Author.When,
+		},
+		Committer: Signature{
+			Name:  c.Committer.Name,
+			Email: c.Committer.Email,
+			Time:  c.Committer.When,
+		},
+		TreeHash: c.TreeHash.String(),
+	}
+	return
 }
 
-func trace(vals ...interface{}) func(vals ...interface{}) {
-	return libtrace.Trace(1, "", vals...)
+func DecodeTree(content []byte) (res []*TreeEntry, err error) {
+	obj := &plumbing.MemoryObject{}
+	obj.SetType(plumbing.TreeObject)
+	obj.Write(content)
+	t := &object.Tree{}
+	err = t.Decode(obj)
+	if nil != err {
+		return
+	}
+	res = make([]*TreeEntry, len(t.Entries))
+	for i, e := range t.Entries {
+		res[i] = &TreeEntry{
+			Name: e.Name,
+			Mode: uint32(e.Mode),
+			Hash: e.Hash.String(),
+		}
+	}
+	return
 }
