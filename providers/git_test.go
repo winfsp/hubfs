@@ -13,7 +13,9 @@
 package providers
 
 import (
+	"bytes"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
 	"testing"
@@ -225,6 +227,52 @@ func TestGetTreeEntry(t *testing.T) {
 		t.Error(err)
 	}
 	if subentry.Name() != subentryName {
+		t.Error()
+	}
+}
+
+func TestGetBlobReader(t *testing.T) {
+	ref, err := repository.GetRef(refName)
+	if nil != err {
+		t.Error(err)
+	}
+	if ref.Name() != refName {
+		t.Error()
+	}
+
+	entry, err := repository.GetTreeEntry(ref, nil, subtreeName)
+	if nil != err {
+		t.Error(err)
+	}
+	if entry.Name() != subtreeName {
+		t.Error()
+	}
+
+	subentry, err := repository.GetTreeEntry(nil, entry, subentryName)
+	if nil != err {
+		t.Error(err)
+	}
+	if subentry.Name() != subentryName {
+		t.Error()
+	}
+
+	reader, err := repository.GetBlobReader(subentry)
+	if nil != err {
+		t.Error(err)
+	}
+	content, err := ioutil.ReadAll(reader.(io.Reader))
+	reader.(io.Closer).Close()
+	if !bytes.Contains(content, []byte("package providers")) {
+		t.Error()
+	}
+
+	reader, err = repository.GetBlobReader(subentry)
+	if nil != err {
+		t.Error(err)
+	}
+	content, err = ioutil.ReadAll(reader.(io.Reader))
+	reader.(io.Closer).Close()
+	if !bytes.Contains(content, []byte("package providers")) {
 		t.Error()
 	}
 }

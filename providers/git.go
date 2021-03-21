@@ -157,19 +157,31 @@ func (r *gitRepository) fetchObjects(dir string, want []string,
 	}
 }
 
+type readerAt interface {
+	io.Reader
+	io.ReaderAt
+}
+
+type readerAtNopCloser struct {
+	readerAt
+}
+
+func (readerAtNopCloser) Close() error {
+	return nil
+}
+
 func (r *gitRepository) fetchReaders(dir string, want []string,
 	fn func(hash string, reader io.ReaderAt) error) error {
 
 	if "" != dir {
 		w := make([]string, 0, len(want))
-		for _, hash := range w {
+		for _, hash := range want {
 			p := objectPath(dir, hash)
 			file, err := os.Open(p)
 			if nil != err {
 				w = append(w, hash)
 			} else {
 				err = fn(hash, file)
-				file.Close()
 				if nil != err {
 					return err
 				}
@@ -184,20 +196,25 @@ func (r *gitRepository) fetchReaders(dir string, want []string,
 		return r.repo.FetchObjects(want, func(hash string, content []byte) error {
 			p := objectPath(dir, hash)
 			if nil == os.MkdirAll(filepath.Dir(p), 0700) {
-				ioutil.WriteFile(p+".tmp", content, 0700)
-				os.Rename(p+".tmp", p)
+				err := ioutil.WriteFile(p+".tmp", content, 0700)
+				if nil == err {
+					err = os.Rename(p+".tmp", p)
+				}
+				if nil != err {
+					os.Remove(p + ".tmp")
+				}
 			}
 			file, err := os.Open(p)
 			if nil != err {
 				return err
 			}
 			err = fn(hash, file)
-			file.Close()
 			return err
 		})
 	} else {
 		return r.repo.FetchObjects(want, func(hash string, content []byte) error {
-			return fn(hash, bytes.NewReader(content))
+			reader := readerAtNopCloser{bytes.NewReader(content)}
+			return fn(hash, reader)
 		})
 	}
 }
@@ -386,7 +403,12 @@ func (r *gitRepository) GetBlobReader(entry TreeEntry) (res io.ReaderAt, err err
 	dir := r.dir
 	r.lock.RUnlock()
 
-	err = r.fetchReaders(dir, []string{entry.Hash()}, func(hash string, reader io.ReaderAt) error {
+	want := []string{entry.Hash()}
+	err = r.fetchReaders(dir, want, func(hash string, reader io.ReaderAt) error {
+		if want[0] != hash {
+			reader.(io.Closer).Close()
+			return nil
+		}
 		res = reader
 		return nil
 	})
