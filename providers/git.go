@@ -116,14 +116,35 @@ func objectPath(dir string, hash string) string {
 	return ""
 }
 
+func writeObject(dir string, hash string, content []byte) {
+	p := objectPath(dir, hash)
+	if nil == os.MkdirAll(filepath.Dir(p), 0700) {
+		err := ioutil.WriteFile(p+".tmp", content, 0700)
+		if nil == err {
+			err = os.Rename(p+".tmp", p)
+		}
+		if nil != err {
+			os.Remove(p + ".tmp")
+		}
+	}
+}
+
+func containsString(l []string, s string) bool {
+	for _, i := range l {
+		if i == s {
+			return true
+		}
+	}
+	return false
+}
+
 func (r *gitRepository) fetchObjects(dir string, want []string,
 	fn func(hash string, content []byte) error) error {
 
 	if "" != dir {
 		w := make([]string, 0, len(want))
 		for _, hash := range want {
-			p := objectPath(dir, hash)
-			content, err := ioutil.ReadFile(p)
+			content, err := ioutil.ReadFile(objectPath(dir, hash))
 			if nil != err {
 				w = append(w, hash)
 			} else {
@@ -140,20 +161,19 @@ func (r *gitRepository) fetchObjects(dir string, want []string,
 		}
 
 		return r.repo.FetchObjects(want, func(hash string, content []byte) error {
-			p := objectPath(dir, hash)
-			if nil == os.MkdirAll(filepath.Dir(p), 0700) {
-				err := ioutil.WriteFile(p+".tmp", content, 0700)
-				if nil == err {
-					err = os.Rename(p+".tmp", p)
-				}
-				if nil != err {
-					os.Remove(p + ".tmp")
-				}
+			writeObject(dir, hash, content)
+			if !containsString(want, hash) {
+				return nil
 			}
 			return fn(hash, content)
 		})
 	} else {
-		return r.repo.FetchObjects(want, fn)
+		return r.repo.FetchObjects(want, func(hash string, content []byte) error {
+			if !containsString(want, hash) {
+				return nil
+			}
+			return fn(hash, content)
+		})
 	}
 }
 
@@ -176,8 +196,7 @@ func (r *gitRepository) fetchReaders(dir string, want []string,
 	if "" != dir {
 		w := make([]string, 0, len(want))
 		for _, hash := range want {
-			p := objectPath(dir, hash)
-			file, err := os.Open(p)
+			file, err := os.Open(objectPath(dir, hash))
 			if nil != err {
 				w = append(w, hash)
 			} else {
@@ -194,25 +213,21 @@ func (r *gitRepository) fetchReaders(dir string, want []string,
 		}
 
 		return r.repo.FetchObjects(want, func(hash string, content []byte) error {
-			p := objectPath(dir, hash)
-			if nil == os.MkdirAll(filepath.Dir(p), 0700) {
-				err := ioutil.WriteFile(p+".tmp", content, 0700)
-				if nil == err {
-					err = os.Rename(p+".tmp", p)
-				}
-				if nil != err {
-					os.Remove(p + ".tmp")
-				}
+			writeObject(dir, hash, content)
+			if !containsString(want, hash) {
+				return nil
 			}
-			file, err := os.Open(p)
+			reader, err := os.Open(objectPath(dir, hash))
 			if nil != err {
 				return err
 			}
-			err = fn(hash, file)
-			return err
+			return fn(hash, reader)
 		})
 	} else {
 		return r.repo.FetchObjects(want, func(hash string, content []byte) error {
+			if !containsString(want, hash) {
+				return nil
+			}
 			reader := readerAtNopCloser{bytes.NewReader(content)}
 			return fn(hash, reader)
 		})
@@ -315,9 +330,6 @@ func (r *gitRepository) ensureTree(
 	want := []string{""}
 	if nil == entry {
 		err := r.fetchObjects(dir, []string{ref.commitHash}, func(hash string, content []byte) error {
-			if ref.commitHash != hash {
-				return nil
-			}
 			c, err := git.DecodeCommit(content)
 			if nil != err {
 				return nil
@@ -335,9 +347,6 @@ func (r *gitRepository) ensureTree(
 
 	tree := make(map[string]*gitTreeEntry)
 	err := r.fetchObjects(dir, want, func(hash string, content []byte) error {
-		if want[0] != hash {
-			return nil
-		}
 		t, err := git.DecodeTree(content)
 		if nil != err {
 			return nil
@@ -405,10 +414,6 @@ func (r *gitRepository) GetBlobReader(entry TreeEntry) (res io.ReaderAt, err err
 
 	want := []string{entry.Hash()}
 	err = r.fetchReaders(dir, want, func(hash string, reader io.ReaderAt) error {
-		if want[0] != hash {
-			reader.(io.Closer).Close()
-			return nil
-		}
 		res = reader
 		return nil
 	})
