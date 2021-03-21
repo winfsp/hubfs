@@ -196,11 +196,11 @@ func (r *gitRepository) fetchReaders(dir string, want []string,
 	if "" != dir {
 		w := make([]string, 0, len(want))
 		for _, hash := range want {
-			file, err := os.Open(objectPath(dir, hash))
+			reader, err := os.Open(objectPath(dir, hash))
 			if nil != err {
 				w = append(w, hash)
 			} else {
-				err = fn(hash, file)
+				err = fn(hash, reader)
 				if nil != err {
 					return err
 				}
