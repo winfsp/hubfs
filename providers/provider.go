@@ -14,6 +14,7 @@ package providers
 
 import (
 	"errors"
+	"io"
 	"net/url"
 	"sync"
 	"time"
@@ -28,13 +29,13 @@ type Provider interface {
 
 type Client interface {
 	GetOwners() ([]Owner, error)
-	GetOwner(name string, acquire bool) (Owner, error)
-	ReleaseOwner(owner Owner)
+	OpenOwner(name string) (Owner, error)
+	CloseOwner(owner Owner)
 	GetRepositories(owner Owner) ([]Repository, error)
-	GetRepository(owner Owner, name string, acquire bool) (Repository, error)
-	ReleaseRepository(repository Repository)
-	Start(timeToLive time.Duration)
-	Stop()
+	OpenRepository(owner Owner, name string) (Repository, error)
+	CloseRepository(repository Repository)
+	StartExpiration(timeToLive time.Duration)
+	StopExpiration()
 }
 
 type Owner interface {
@@ -42,12 +43,31 @@ type Owner interface {
 }
 
 type Repository interface {
+	io.Closer
+	SetDirectory(path string) error
+	RemoveDirectory() error
 	Name() string
+	GetRefs() ([]Ref, error)
+	GetRef(name string) (Ref, error)
+	GetTree(ref Ref, entry TreeEntry) ([]TreeEntry, error)
+	GetTreeEntry(ref Ref, entry TreeEntry, name string) (TreeEntry, error)
+	GetBlobReader(entry TreeEntry) (io.ReaderAt, error)
+}
+
+type Ref interface {
+	Name() string
+	TreeTime() time.Time
+}
+
+type TreeEntry interface {
+	Name() string
+	Mode() uint32
+	Hash() string
 }
 
 var ErrNotFound = errors.New("not found")
 
-var lock sync.Mutex
+var lock sync.RWMutex
 var providers = make(map[string]Provider)
 
 func GetProviderName(uri *url.URL) string {
@@ -59,8 +79,8 @@ func GetProviderName(uri *url.URL) string {
 }
 
 func GetProvider(name string) Provider {
-	lock.Lock()
-	defer lock.Unlock()
+	lock.RLock()
+	defer lock.RUnlock()
 	return providers[name]
 }
 
