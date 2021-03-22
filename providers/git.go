@@ -97,6 +97,10 @@ func (r *gitRepository) SetDirectory(path string) (err error) {
 
 func (r *gitRepository) RemoveDirectory() (err error) {
 	r.lock.Lock()
+	if "" != r.dir {
+		r.lock.Unlock()
+		return
+	}
 	tmpdir := r.dir + time.Now().Format(".20060102T150405.000Z")
 	err = os.Rename(r.dir, tmpdir)
 	if nil == err {
