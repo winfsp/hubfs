@@ -14,14 +14,11 @@ package providers
 
 import (
 	"bytes"
-	"fmt"
 	"io"
 	"io/ioutil"
-	"os"
 	"testing"
 
 	"github.com/billziss-gh/golib/keyring"
-	libtrace "github.com/billziss-gh/golib/trace"
 )
 
 const remote = "https://github.com/billziss-gh/hubfs"
@@ -277,39 +274,33 @@ func TestGetBlobReader(t *testing.T) {
 	}
 }
 
-func runRepositoryTests(m *testing.M) int {
-	token, err := keyring.Get("hubfs", "https://github.com")
-	if nil != err {
-		fmt.Fprintf(os.Stderr, "error: keyring.Get: %v\n", err)
-		return 1
-	}
+func init() {
+	atinit(func() error {
+		token, err := keyring.Get("hubfs", "https://github.com")
+		if nil != err {
+			return err
+		}
 
-	repository, err = NewGitRepository(remote, token)
-	if nil != err {
-		fmt.Fprintf(os.Stderr, "error: NewGitRepository: %v\n", err)
-		return 1
-	}
+		repository, err = NewGitRepository(remote, token)
+		if nil != err {
+			return err
+		}
 
-	tdir, err := ioutil.TempDir("", "git_test")
-	if nil != err {
-		fmt.Fprintf(os.Stderr, "error: ioutil.TempDir: %v\n", err)
-		return 1
-	}
+		tdir, err := ioutil.TempDir("", "git_test")
+		if nil != err {
+			return err
+		}
 
-	err = repository.SetDirectory(tdir)
-	if nil != err {
-		fmt.Fprintf(os.Stderr, "error: repository.SetDirectory: %v\n", err)
-		return 1
-	}
-	defer repository.RemoveDirectory()
-	defer repository.Close()
+		err = repository.SetDirectory(tdir)
+		if nil != err {
+			return err
+		}
 
-	return m.Run()
-}
+		atexit(func() {
+			repository.RemoveDirectory()
+			repository.Close()
+		})
 
-func TestMain(m *testing.M) {
-	libtrace.Verbose = true
-	libtrace.Pattern = "github.com/billziss-gh/hubfs/*"
-
-	os.Exit(runRepositoryTests(m))
+		return nil
+	})
 }
