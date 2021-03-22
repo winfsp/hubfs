@@ -21,57 +21,38 @@ import (
 	"sync"
 	"time"
 
-	"github.com/billziss-gh/golib/cache"
+	libcache "github.com/billziss-gh/golib/cache"
 	"github.com/billziss-gh/hubfs/httputil"
 	"github.com/cli/oauth"
 )
 
-const (
-	// Auth
-	hostname     = "github.com"
-	clientId     = "4c24e0557d7103e3c4b0" // safe to embed
-	clientSecret = "ClientSecret"
-	callbackURI  = "http://127.0.0.1/callback"
-	scopes       = "repo"
-
-	// API
-	baseurl = "https://api.github.com"
-)
-
-type githubProvider struct {
+type GithubProvider struct {
+	Hostname     string
+	ClientId     string
+	ClientSecret string
+	CallbackURI  string
+	Scopes       string
+	ApiURI       string
 }
 
-type githubClient struct {
-	sync.Mutex
-	httpClient *http.Client
-	baseurl    string
-	token      string
-	login      string
-	lrulist    cache.MapItem
-	owners     *cache.Map
-	ttl        time.Duration
-	stopC      chan bool
-	stopW      *sync.WaitGroup
+func NewGithubProvider() *GithubProvider {
+	return &GithubProvider{
+		Hostname:     "github.com",
+		ClientId:     "4c24e0557d7103e3c4b0", // safe to embed
+		ClientSecret: "ClientSecret",
+		CallbackURI:  "http://127.0.0.1/callback",
+		Scopes:       "repo",
+		ApiURI:       "https://api.github.com",
+	}
 }
 
-type githubOwner struct {
-	cachedItem
-	repositories *cache.Map
-	FName        string `json:"login"`
-}
-
-type githubRepository struct {
-	cachedItem
-	FName string `json:"name"`
-}
-
-func (provider *githubProvider) Auth() (token string, err error) {
+func (provider *GithubProvider) Auth() (token string, err error) {
 	flow := &oauth.Flow{
-		Hostname:     hostname,
-		ClientID:     clientId,
-		ClientSecret: clientSecret,
-		CallbackURI:  callbackURI,
-		Scopes:       strings.Split(scopes, ","),
+		Hostname:     provider.Hostname,
+		ClientID:     provider.ClientId,
+		ClientSecret: provider.ClientSecret,
+		CallbackURI:  provider.CallbackURI,
+		Scopes:       strings.Split(provider.Scopes, ","),
 		HTTPClient:   httputil.DefaultClient,
 	}
 	accessToken, err := flow.DetectFlow()
@@ -81,41 +62,78 @@ func (provider *githubProvider) Auth() (token string, err error) {
 	return
 }
 
-func (provider *githubProvider) NewClient(token string) (Client, error) {
+func (provider *GithubProvider) NewClient(token string) (Client, error) {
+	return NewGithubClient(provider.ApiURI, token)
+}
+
+func init() {
+	provider := NewGithubProvider()
+	RegisterProvider("https://"+provider.Hostname, provider)
+}
+
+type githubClient struct {
+	httpClient *http.Client
+	apiURI     string
+	token      string
+	login      string
+	lock       sync.Mutex
+	cache      *cache
+	owners     *libcache.Map
+}
+
+type githubOwner struct {
+	cacheItem
+	repositories *libcache.Map
+	FName        string `json:"login"`
+}
+
+type githubRepository struct {
+	cacheItem
+	Repository
+	FName   string `json:"name"`
+	FRemote string `json:"clone_url"`
+}
+
+func NewGithubClient(apiURI string, token string) (Client, error) {
 	client := &githubClient{
 		httpClient: httputil.DefaultClient,
-		baseurl:    baseurl,
+		apiURI:     apiURI,
 		token:      token,
 	}
-	client.lrulist.Empty()
+	client.cache = newCache(&client.lock)
+	client.cache.Value = client
 
-	rsp, err := client.sendrecv("/user")
-	if nil != err {
-		return nil, err
-	}
-	defer rsp.Body.Close()
+	if "" != client.token {
+		rsp, err := client.sendrecv("/user")
+		if nil != err {
+			return nil, err
+		}
+		defer rsp.Body.Close()
 
-	var content struct {
-		FName string `json:"login"`
-	}
-	err = json.NewDecoder(rsp.Body).Decode(&content)
-	if nil != err {
-		return nil, err
-	}
+		var content struct {
+			Login string `json:"login"`
+		}
+		err = json.NewDecoder(rsp.Body).Decode(&content)
+		if nil != err {
+			return nil, err
+		}
 
-	client.login = content.FName
+		client.login = content.Login
+	}
 
 	return client, nil
 }
 
 func (client *githubClient) sendrecv(path string) (*http.Response, error) {
-	req, err := http.NewRequest("GET", client.baseurl+path, nil)
+	req, err := http.NewRequest("GET", client.apiURI+path, nil)
 	if nil != err {
 		return nil, err
 	}
 
 	req.Header.Set("Accept", "application/vnd.github.v3+json")
-	req.Header.Set("Authorization", "token "+client.token)
+	if "" != client.token {
+		req.Header.Set("Authorization", "token "+client.token)
+	}
 
 	rsp, err := client.httpClient.Do(req)
 	if nil != err {
@@ -130,7 +148,6 @@ func (client *githubClient) sendrecv(path string) (*http.Response, error) {
 }
 
 func (client *githubClient) getOwner(owner string) (res *githubOwner, err error) {
-	defer trace(owner)(&err)
 	rsp, err := client.sendrecv(fmt.Sprintf("/users/%s", owner))
 	if nil != err {
 		return nil, err
@@ -163,14 +180,13 @@ func (client *githubClient) getRepositoryPage(path string) ([]*githubRepository,
 
 	for _, elm := range content {
 		elm.Value = elm
+		elm.Repository = emptyRepository
 	}
 
 	return content, nil
 }
 
 func (client *githubClient) getRepositories(owner string) (res []*githubRepository, err error) {
-	defer trace(owner)(&err)
-
 	var path string
 	if client.login == owner {
 		path = "/user/repos?visibility=all&affiliation=owner,organization_member&per_page=100"
@@ -197,93 +213,84 @@ func (client *githubClient) GetOwners() ([]Owner, error) {
 	return []Owner{}, nil
 }
 
-func (client *githubClient) GetOwner(name string, acquire bool) (Owner, error) {
+func (client *githubClient) OpenOwner(name string) (Owner, error) {
 	var res *githubOwner
 	var err error
-	var item *cache.MapItem
-	var ok bool
 
-	delta := 0
-	if acquire {
-		delta = +1
-	}
-
-	client.Lock()
+	client.lock.Lock()
 	if nil != client.owners {
-		item, ok = client.owners.Get(name)
+		item, ok := client.owners.Get(name)
 		if ok {
 			res = item.Value.(*githubOwner)
-			res.cachedItem.touchCachedItem(client.ttl, delta)
+			client.cache.touchCacheItem(&res.cacheItem, +1)
+			client.lock.Unlock()
+			return res, nil
 		}
 	}
-	client.Unlock()
-	if ok {
-		return res, nil
-	}
+	client.lock.Unlock()
 
 	res, err = client.getOwner(name)
 	if nil != err {
 		return nil, err
 	}
 
-	client.Lock()
+	client.lock.Lock()
 	if nil == client.owners {
-		client.owners = cache.NewMap(&client.lrulist)
+		client.owners = client.cache.newCacheMap()
 	}
-	item, ok = client.owners.Get(name)
+	item, ok := client.owners.Get(name)
 	if ok {
 		res = item.Value.(*githubOwner)
-		res.cachedItem.touchCachedItem(client.ttl, delta)
 	} else {
 		client.owners.Set(name, &res.MapItem, true)
-		res.cachedItem.touchCachedItem(client.ttl, delta)
 	}
-	client.Unlock()
+	client.cache.touchCacheItem(&res.cacheItem, +1)
+	client.lock.Unlock()
 	return res, nil
 }
 
-func (client *githubClient) ReleaseOwner(owner Owner) {
-	client.Lock()
-	owner.(*githubOwner).cachedItem.touchCachedItem(client.ttl, -1)
-	client.Unlock()
+func (client *githubClient) CloseOwner(owner Owner) {
+	client.lock.Lock()
+	client.cache.touchCacheItem(&owner.(*githubOwner).cacheItem, -1)
+	client.lock.Unlock()
 }
 
-func (client *githubClient) ensureRepositories(own *githubOwner, fn func() error) error {
-	client.Lock()
-	if nil != own.repositories {
+func (client *githubClient) ensureRepositories(owner *githubOwner, fn func() error) error {
+	client.lock.Lock()
+	if nil != owner.repositories {
 		err := fn()
-		client.Unlock()
+		client.lock.Unlock()
 		return err
 	}
-	client.Unlock()
+	client.lock.Unlock()
 
-	repositories, err := client.getRepositories(own.FName)
+	repositories, err := client.getRepositories(owner.FName)
 	if nil != err {
 		return err
 	}
 
-	client.Lock()
-	if nil == own.repositories {
-		own.repositories = cache.NewMap(&client.lrulist)
+	client.lock.Lock()
+	if nil == owner.repositories {
+		owner.repositories = client.cache.newCacheMap()
 		for _, elm := range repositories {
-			own.repositories.Set(elm.FName, &elm.MapItem, true)
-			elm.cachedItem.touchCachedItem(client.ttl, 0)
+			owner.repositories.Set(elm.FName, &elm.MapItem, true)
+			client.cache.touchCacheItem(&elm.cacheItem, 0)
 		}
 	}
 	err = fn()
-	client.Unlock()
+	client.lock.Unlock()
 	return err
 }
 
-func (client *githubClient) GetRepositories(owner Owner) ([]Repository, error) {
+func (client *githubClient) GetRepositories(owner0 Owner) ([]Repository, error) {
 	var res []Repository
 	var err error
 
-	own := owner.(*githubOwner)
-	err = client.ensureRepositories(own, func() error {
-		res = make([]Repository, len(own.repositories.Items()))
+	owner := owner0.(*githubOwner)
+	err = client.ensureRepositories(owner, func() error {
+		res = make([]Repository, len(owner.repositories.Items()))
 		i := 0
-		for _, elm := range own.repositories.Items() {
+		for _, elm := range owner.repositories.Items() {
 			res[i] = elm.Value.(Repository)
 			i++
 		}
@@ -293,92 +300,60 @@ func (client *githubClient) GetRepositories(owner Owner) ([]Repository, error) {
 	return res, err
 }
 
-func (client *githubClient) GetRepository(owner Owner, name string, acquire bool) (Repository, error) {
+func (client *githubClient) OpenRepository(owner0 Owner, name string) (Repository, error) {
 	var res *githubRepository
 	var err error
 
-	own := owner.(*githubOwner)
-	delta := 0
-	if acquire {
-		delta = +1
-	}
-
-	err = client.ensureRepositories(own, func() error {
-		var item *cache.MapItem
-		var ok bool
-		item, ok = own.repositories.Get(name)
+	owner := owner0.(*githubOwner)
+	err = client.ensureRepositories(owner, func() error {
+		item, ok := owner.repositories.Get(name)
 		if !ok {
 			return ErrNotFound
 		}
 		res = item.Value.(*githubRepository)
-		res.cachedItem.touchCachedItem(client.ttl, delta)
+		if emptyRepository == res.Repository {
+			res.Repository = newGitRepository(res.FRemote, client.token)
+		}
+		client.cache.touchCacheItem(&res.cacheItem, +1)
 		return nil
 	})
 
 	return res, err
 }
 
-func (client *githubClient) ReleaseRepository(repository Repository) {
-	client.Lock()
-	repository.(*githubRepository).cachedItem.touchCachedItem(client.ttl, -1)
-	client.Unlock()
+func (client *githubClient) CloseRepository(repository Repository) {
+	client.lock.Lock()
+	client.cache.touchCacheItem(&repository.(*githubRepository).cacheItem, -1)
+	client.lock.Unlock()
 }
 
-func (client *githubClient) tick() {
-	defer client.stopW.Done()
-	ticker := time.NewTicker(1 * time.Second)
-	for {
-		select {
-		case <-ticker.C:
-			currentTime := time.Now()
-			client.Lock()
-			client.lrulist.Expire(func(list, item *cache.MapItem) bool {
-				switch obj := item.Value.(type) {
-				case *githubOwner:
-					return obj.cachedItem.expireCachedItem(list, client.ttl, currentTime, func() {
-						client.owners.Delete(obj.FName)
-					})
-				case *githubRepository:
-					return obj.cachedItem.expireCachedItem(list, client.ttl, currentTime, func() {
-						// ...
-					})
-				default:
-					panic("unexpected cached item type")
-				}
-			})
-			client.Unlock()
-		case <-client.stopC:
-			ticker.Stop()
-			return
-		}
-	}
+func (client *githubClient) StartExpiration(timeToLive time.Duration) {
+	client.cache.startExpiration(timeToLive)
 }
 
-func (client *githubClient) Start(timeToLive time.Duration) {
-	client.ttl = timeToLive
-	client.stopC = make(chan bool, 1)
-	client.stopW = &sync.WaitGroup{}
-	client.stopW.Add(1)
-	go client.tick()
+func (client *githubClient) StopExpiration() {
+	client.cache.stopExpiration()
 }
 
-func (client *githubClient) Stop() {
-	client.stopC <- true
-	client.stopW.Wait()
-	close(client.stopC)
-	client.ttl = 0
-	client.stopC = nil
-	client.stopW = nil
+func (o *githubOwner) Name() string {
+	return o.FName
 }
 
-func (owner *githubOwner) Name() string {
-	return owner.FName
+func (o *githubOwner) expire(c *cache, currentTime time.Time) bool {
+	return c.expireCacheItem(&o.cacheItem, currentTime, func() {
+		client := c.Value.(*githubClient)
+		client.owners.Delete(o.FName)
+	})
 }
 
-func (repository *githubRepository) Name() string {
-	return repository.FName
+func (r *githubRepository) Name() string {
+	return r.FName
 }
 
-func init() {
-	RegisterProvider("https://"+hostname, &githubProvider{})
+func (r *githubRepository) expire(c *cache, currentTime time.Time) bool {
+	return c.expireCacheItem(&r.cacheItem, currentTime, func() {
+		r.Close()
+		r.RemoveDirectory()
+		r.Repository = emptyRepository
+	})
 }

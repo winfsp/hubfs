@@ -13,13 +13,10 @@
 package providers
 
 import (
-	"fmt"
-	"os"
 	"testing"
 	"time"
 
 	"github.com/billziss-gh/golib/keyring"
-	libtrace "github.com/billziss-gh/golib/trace"
 )
 
 const ownerName = "billziss-gh"
@@ -27,29 +24,32 @@ const repositoryName = "hubfs"
 
 var client Client
 
-func TestGetOwner(t *testing.T) {
-	owner, err := client.GetOwner(ownerName, false)
+func TestOpenCloseOwner(t *testing.T) {
+	owner, err := client.OpenOwner(ownerName)
 	if nil != err {
 		t.Error(err)
 	}
 	if owner.Name() != ownerName {
 		t.Error()
 	}
+	client.CloseOwner(owner)
 
-	owner, err = client.GetOwner(ownerName, false)
+	owner, err = client.OpenOwner(ownerName)
 	if nil != err {
 		t.Error(err)
 	}
 	if owner.Name() != ownerName {
 		t.Error()
 	}
+	client.CloseOwner(owner)
 }
 
 func TestGetRepositories(t *testing.T) {
-	owner, err := client.GetOwner(ownerName, false)
+	owner, err := client.OpenOwner(ownerName)
 	if nil != err {
 		t.Error(err)
 	}
+	defer client.CloseOwner(owner)
 	if owner.Name() != ownerName {
 		t.Error()
 	}
@@ -85,37 +85,40 @@ func TestGetRepositories(t *testing.T) {
 	}
 }
 
-func TestGetRepository(t *testing.T) {
-	owner, err := client.GetOwner(ownerName, false)
+func TestOpenCloseRepository(t *testing.T) {
+	owner, err := client.OpenOwner(ownerName)
 	if nil != err {
 		t.Error(err)
 	}
+	defer client.CloseOwner(owner)
 	if owner.Name() != ownerName {
 		t.Error()
 	}
 
-	repository, err := client.GetRepository(owner, repositoryName, false)
+	repository, err := client.OpenRepository(owner, repositoryName)
 	if nil != err {
 		t.Error(err)
 	}
 	if repository.Name() != repositoryName {
 		t.Error()
 	}
+	client.CloseRepository(repository)
 
-	repository, err = client.GetRepository(owner, repositoryName, false)
+	repository, err = client.OpenRepository(owner, repositoryName)
 	if nil != err {
 		t.Error(err)
 	}
 	if repository.Name() != repositoryName {
 		t.Error()
 	}
+	client.CloseRepository(repository)
 }
 
 func testExpiration(t *testing.T) {
-	client.Start(1 * time.Second)
-	defer client.Stop()
+	client.StartExpiration(1 * time.Second)
+	defer client.StopExpiration()
 
-	owner, err := client.GetOwner(ownerName, false)
+	owner, err := client.OpenOwner(ownerName)
 	if nil != err {
 		t.Error(err)
 	}
@@ -123,17 +126,20 @@ func testExpiration(t *testing.T) {
 		t.Error()
 	}
 
-	repository, err := client.GetRepository(owner, repositoryName, false)
+	repository, err := client.OpenRepository(owner, repositoryName)
 	if nil != err {
 		t.Error(err)
 	}
 	if repository.Name() != repositoryName {
 		t.Error()
 	}
+
+	client.CloseRepository(repository)
+	client.CloseOwner(owner)
 
 	time.Sleep(2 * time.Second)
 
-	owner, err = client.GetOwner(ownerName, false)
+	owner, err = client.OpenOwner(ownerName)
 	if nil != err {
 		t.Error(err)
 	}
@@ -141,13 +147,16 @@ func testExpiration(t *testing.T) {
 		t.Error()
 	}
 
-	repository, err = client.GetRepository(owner, repositoryName, false)
+	repository, err = client.OpenRepository(owner, repositoryName)
 	if nil != err {
 		t.Error(err)
 	}
 	if repository.Name() != repositoryName {
 		t.Error()
 	}
+
+	client.CloseRepository(repository)
+	client.CloseOwner(owner)
 }
 
 func TestExpiration(t *testing.T) {
@@ -155,18 +164,18 @@ func TestExpiration(t *testing.T) {
 	testExpiration(t)
 }
 
-func TestMain(m *testing.M) {
-	libtrace.Verbose = true
-	libtrace.Pattern = "github.com/billziss-gh/hubfs/*"
+func init() {
+	atinit(func() error {
+		token, err := keyring.Get("hubfs", "https://github.com")
+		if nil != err {
+			return err
+		}
 
-	token, err := keyring.Get("hubfs", "https://github.com")
-	if nil == err {
 		client, err = GetProvider("https://github.com").NewClient(token)
-	}
-	if nil != err {
-		fmt.Fprintf(os.Stderr, "unable to create GitHub client: %v\n", err)
-		os.Exit(1)
-	}
+		if nil != err {
+			return err
+		}
 
-	os.Exit(m.Run())
+		return nil
+	})
 }
