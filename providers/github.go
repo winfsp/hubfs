@@ -148,6 +148,8 @@ func (client *githubClient) sendrecv(path string) (*http.Response, error) {
 }
 
 func (client *githubClient) getOwner(owner string) (res *githubOwner, err error) {
+	defer trace(owner)(&err)
+
 	rsp, err := client.sendrecv(fmt.Sprintf("/users/%s", owner))
 	if nil != err {
 		return nil, err
@@ -187,6 +189,8 @@ func (client *githubClient) getRepositoryPage(path string) ([]*githubRepository,
 }
 
 func (client *githubClient) getRepositories(owner string) (res []*githubRepository, err error) {
+	defer trace(owner)(&err)
+
 	var path string
 	if client.login == owner {
 		path = "/user/repos?visibility=all&affiliation=owner,organization_member&per_page=100"

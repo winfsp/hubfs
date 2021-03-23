@@ -18,6 +18,7 @@ import (
 	"testing"
 
 	"github.com/billziss-gh/golib/keyring"
+	libtrace "github.com/billziss-gh/golib/trace"
 )
 
 const remote = "https://github.com/billziss-gh/hubfs"
@@ -149,6 +150,9 @@ func TestFetchObjects(t *testing.T) {
 }
 
 func TestMain(m *testing.M) {
+	libtrace.Verbose = true
+	libtrace.Pattern = "github.com/billziss-gh/hubfs/*"
+
 	var err error
 	token, err = keyring.Get("hubfs", "https://github.com")
 	if nil != err {

@@ -39,6 +39,7 @@ func TestMain(m *testing.M) {
 		err := atinitFn[i]()
 		if nil != err {
 			fmt.Printf("error: during init: %v\n", err)
+			os.Exit(1)
 		}
 	}
 

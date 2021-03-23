@@ -17,6 +17,7 @@ import (
 	"io"
 	"time"
 
+	libtrace "github.com/billziss-gh/golib/trace"
 	"github.com/billziss-gh/hubfs/httputil"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/format/packfile"
@@ -171,6 +172,8 @@ func (obs *observer) OnFooter(h plumbing.Hash) error {
 
 func (repository *Repository) FetchObjects(wants []string,
 	fn func(hash string, content []byte) error) (err error) {
+	defer trace(len(wants))(&err)
+
 	req := packp.NewUploadPackRequestFromCapabilities(repository.advrefs.Capabilities)
 
 	if nil == req.Capabilities.Set("shallow") {
@@ -260,4 +263,8 @@ func DecodeTree(content []byte) (res []*TreeEntry, err error) {
 		}
 	}
 	return
+}
+
+func trace(vals ...interface{}) func(vals ...interface{}) {
+	return libtrace.Trace(1, "", vals...)
 }
