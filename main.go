@@ -52,23 +52,47 @@ func (mntopt *mntopt) Set(s string) error {
 	return nil
 }
 
+func newClientWithKey(provider providers.Provider, authkey string) (
+	client providers.Client, err error) {
+	token, err := keyring.Get(MyProductName, authkey)
+	if nil == err {
+		client, err = provider.NewClient(token)
+		if nil != err {
+			keyring.Delete(MyProductName, authkey)
+		}
+	}
+	return
+}
+
+func authNewClientWithKey(provider providers.Provider, authkey string) (
+	client providers.Client, err error) {
+	token, err := provider.Auth()
+	if nil == err {
+		client, err = provider.NewClient(token)
+		if nil == err {
+			keyring.Set(MyProductName, authkey, token)
+		}
+	}
+	return
+}
+
 func run() (ec int) {
-	doauth := false
-	noauth := false
-	grname := ""
+	authmeth := "full"
+	authkey := ""
+	authonly := false
 	mntopt := mntopt{}
 	remote := "github.com"
 	mntpnt := ""
 
 	flag.Usage = func() {
-		fmt.Fprintf(os.Stderr, "usage: %s [-o options] [remote] mountpoint\n\n",
+		fmt.Fprintf(os.Stderr, "usage: %s [options] [remote] mountpoint\n\n",
 			strings.TrimSuffix(filepath.Base(os.Args[0]), ".exe"))
 		flag.PrintDefaults()
 	}
 
-	flag.BoolVar(&doauth, "doauth", doauth, "perform auth only; do not mount")
-	flag.BoolVar(&noauth, "noauth", noauth, "do not perform auth; fail if no auth present")
-	flag.StringVar(&grname, "grant", grname, "`name` of key that stores auth grant")
+	flag.StringVar(&authmeth, "auth", authmeth, "auth method {full, required, optional, none}")
+	flag.StringVar(&authkey, "authkey", authkey, "`name` of key that stores auth token")
+	flag.BoolVar(&authonly, "authonly", authonly, "perform auth only; do not mount")
 	flag.Var(&mntopt, "o", "FUSE mount `options`")
 
 	flag.Parse()
@@ -79,22 +103,22 @@ func run() (ec int) {
 		remote = flag.Arg(0)
 		mntpnt = flag.Arg(1)
 	default:
-		if !doauth {
+		if !authonly {
 			flag.Usage()
 			return 2
 		}
 	}
-	if doauth && noauth {
+	switch authmeth {
+	case "full", "required", "optional":
+	case "none":
+		if authonly {
+			flag.Usage()
+			return 2
+		}
+	default:
 		flag.Usage()
 		return 2
 	}
-
-	// fmt.Printf("doauth=%#v\n", doauth)
-	// fmt.Printf("noauth=%#v\n", noauth)
-	// fmt.Printf("keynam=%#v\n", grname)
-	// fmt.Printf("mntopt=%#v\n", mntopt)
-	// fmt.Printf("remote=%#v\n", remote)
-	// fmt.Printf("mntpnt=%#v\n", mntpnt)
 
 	uri, err := url.Parse(remote)
 	if nil != uri && "" == uri.Scheme {
@@ -112,35 +136,33 @@ func run() (ec int) {
 		return 1
 	}
 
-	if "" == grname {
-		grname = provname
+	if "" == authkey {
+		authkey = provname
 	}
 
 	var client providers.Client
-	token, err := keyring.Get(MyProductName, grname)
-	if nil == err {
-		client, err = provider.NewClient(token)
+	switch authmeth {
+	case "full":
+		client, err = newClientWithKey(provider, authkey)
 		if nil != err {
-			keyring.Delete(MyProductName, grname)
+			client, err = authNewClientWithKey(provider, authkey)
 		}
-	}
-	if !noauth && nil != err {
-		token, err = provider.Auth()
-		if nil == err {
-			client, err = provider.NewClient(token)
-			if nil == err {
-				keyring.Set(MyProductName, grname, token)
-			}
+	case "required":
+		client, err = newClientWithKey(provider, authkey)
+	case "optional":
+		client, err = newClientWithKey(provider, authkey)
+		if nil != err {
+			client, err = provider.NewClient("")
 		}
+	case "none":
+		client, err = provider.NewClient("")
 	}
 	if nil != err {
 		warn("client error: %v", err)
 		return 1
 	}
 
-	// fmt.Printf("token =%#v\n", token)
-
-	if !doauth {
+	if !authonly {
 		for _, m := range mntopt {
 			for _, s := range strings.Split(m, ",") {
 				if "debug" == s {
