@@ -163,16 +163,27 @@ func run() (ec int) {
 	}
 
 	if !authonly {
+		config := []string{}
 		for _, m := range mntopt {
 			for _, s := range strings.Split(m, ",") {
-				if "debug" == s {
-					libtrace.Verbose = true
-					libtrace.Pattern = "github.com/billziss-gh/hubfs/*"
-				}
+				config = append(config, s)
 			}
 		}
 
-		if !Mount(client, mntpnt, mntopt) {
+		for _, s := range config {
+			if "debug" == s {
+				libtrace.Verbose = true
+				libtrace.Pattern = "github.com/billziss-gh/hubfs/*"
+			}
+		}
+
+		config, err = client.SetConfig(config)
+		if nil != err {
+			warn("config error: %v", err)
+			return 1
+		}
+
+		if !Mount(client, uri.Path, mntpnt, config) {
 			ec = 1
 		}
 	}
