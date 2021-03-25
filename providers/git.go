@@ -164,7 +164,7 @@ func (r *gitRepository) fetchObjects(dir string, want []string,
 			return nil
 		}
 
-		return r.repo.FetchObjects(want, func(hash string, content []byte) error {
+		return r.repo.FetchObjects(want, func(hash string, ot git.ObjectType, content []byte) error {
 			writeObject(dir, hash, content)
 			if !containsString(want, hash) {
 				return nil
@@ -172,7 +172,7 @@ func (r *gitRepository) fetchObjects(dir string, want []string,
 			return fn(hash, content)
 		})
 	} else {
-		return r.repo.FetchObjects(want, func(hash string, content []byte) error {
+		return r.repo.FetchObjects(want, func(hash string, ot git.ObjectType, content []byte) error {
 			if !containsString(want, hash) {
 				return nil
 			}
@@ -216,7 +216,7 @@ func (r *gitRepository) fetchReaders(dir string, want []string,
 			return nil
 		}
 
-		return r.repo.FetchObjects(want, func(hash string, content []byte) error {
+		return r.repo.FetchObjects(want, func(hash string, ot git.ObjectType, content []byte) error {
 			writeObject(dir, hash, content)
 			if !containsString(want, hash) {
 				return nil
@@ -228,7 +228,7 @@ func (r *gitRepository) fetchReaders(dir string, want []string,
 			return fn(hash, reader)
 		})
 	} else {
-		return r.repo.FetchObjects(want, func(hash string, content []byte) error {
+		return r.repo.FetchObjects(want, func(hash string, ot git.ObjectType, content []byte) error {
 			if !containsString(want, hash) {
 				return nil
 			}

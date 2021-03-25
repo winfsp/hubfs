@@ -78,18 +78,19 @@ func TestFetchObjects(t *testing.T) {
 		hash0,
 		hash1,
 	}
-	found := false
+	found0 := false
+	found1 := false
 	err = repository.FetchObjects(wants,
-		func(hash string, content []byte) error {
+		func(hash string, ot ObjectType, content []byte) error {
 			if hash0 == hash {
-				found = true
+				found0 = true
 				_, err := DecodeCommit(content)
 				if nil != err {
 					return err
 				}
 			}
 			if hash1 == hash {
-				found = true
+				found1 = true
 				_, err := DecodeTree(content)
 				if nil != err {
 					return err
@@ -100,18 +101,18 @@ func TestFetchObjects(t *testing.T) {
 	if nil != err {
 		t.Error(err)
 	}
-	if !found {
+	if !found0 || !found1 {
 		t.Error()
 	}
 
 	wants = []string{
 		hash0,
 	}
-	found = false
+	found0 = false
 	err = repository.FetchObjects(wants,
-		func(hash string, content []byte) error {
+		func(hash string, ot ObjectType, content []byte) error {
 			if hash0 == hash {
-				found = true
+				found0 = true
 				_, err := DecodeCommit(content)
 				if nil != err {
 					return err
@@ -122,18 +123,18 @@ func TestFetchObjects(t *testing.T) {
 	if nil != err {
 		t.Error(err)
 	}
-	if !found {
+	if !found0 {
 		t.Error()
 	}
 
 	wants = []string{
 		hash1,
 	}
-	found = false
+	found1 = false
 	err = repository.FetchObjects(wants,
-		func(hash string, content []byte) error {
+		func(hash string, ot ObjectType, content []byte) error {
 			if hash1 == hash {
-				found = true
+				found1 = true
 				_, err := DecodeTree(content)
 				if nil != err {
 					return err
@@ -144,7 +145,7 @@ func TestFetchObjects(t *testing.T) {
 	if nil != err {
 		t.Error(err)
 	}
-	if !found {
+	if !found1 {
 		t.Error()
 	}
 }

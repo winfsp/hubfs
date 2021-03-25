@@ -29,6 +29,15 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/transport/http"
 )
 
+type ObjectType int
+
+const (
+	CommitObject ObjectType = 1
+	TreeObject   ObjectType = 2
+	BlobObject   ObjectType = 3
+	TagObject    ObjectType = 4
+)
+
 type Repository struct {
 	session transport.UploadPackSession
 	advrefs *packp.AdvRefs
@@ -151,19 +160,21 @@ func (m storemap) EncodedObjectSize(hash plumbing.Hash) (int64, error) {
 }
 
 type observer struct {
-	fn func(hash string, content []byte) error
+	fn func(hash string, ot ObjectType, content []byte) error
+	ot ObjectType
 }
 
 func (obs *observer) OnHeader(count uint32) error {
 	return nil
 }
 
-func (obs *observer) OnInflatedObjectHeader(typ plumbing.ObjectType, objSize int64, pos int64) error {
+func (obs *observer) OnInflatedObjectHeader(ot plumbing.ObjectType, objSize int64, pos int64) error {
+	obs.ot = ObjectType(ot)
 	return nil
 }
 
 func (obs *observer) OnInflatedObjectContent(h plumbing.Hash, pos int64, crc uint32, content []byte) error {
-	return obs.fn(h.String(), content)
+	return obs.fn(h.String(), obs.ot, content)
 }
 
 func (obs *observer) OnFooter(h plumbing.Hash) error {
@@ -171,7 +182,7 @@ func (obs *observer) OnFooter(h plumbing.Hash) error {
 }
 
 func (repository *Repository) FetchObjects(wants []string,
-	fn func(hash string, content []byte) error) (err error) {
+	fn func(hash string, ot ObjectType, content []byte) error) (err error) {
 	defer trace(len(wants))(&err)
 
 	req := packp.NewUploadPackRequestFromCapabilities(repository.advrefs.Capabilities)
@@ -181,6 +192,10 @@ func (repository *Repository) FetchObjects(wants []string,
 	}
 	if repository.advrefs.Capabilities.Supports("no-progress") {
 		req.Capabilities.Set("no-progress")
+	}
+	if repository.advrefs.Capabilities.Supports("filter") {
+		req.Capabilities.Set("filter")
+		req.Filter = "tree:0"
 	}
 
 	req.Wants = make([]plumbing.Hash, len(wants))
