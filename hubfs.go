@@ -91,7 +91,7 @@ func (fs *Hubfs) open(p string) (errc int, res *obstack) {
 		case 1:
 			obs.repository, err = fs.client.OpenRepository(obs.owner, c)
 		case 2:
-			obs.ref, err = obs.repository.GetRef(c)
+			obs.ref, err = obs.repository.GetRef("refs/heads/" + c)
 		default:
 			obs.entry, err = obs.repository.GetTreeEntry(obs.ref, obs.entry, c)
 		}
@@ -122,8 +122,6 @@ func (fs *Hubfs) Getattr(path string, stat *fuse.Stat_t, fh uint64) (errc int) {
 
 	if nil != obs.entry {
 		fuseStat(stat, obs.entry.Mode(), 0 /* elm.Size*/, obs.ref.TreeTime())
-	} else if nil != obs.ref {
-		fuseStat(stat, fuse.S_IFDIR, 0, obs.ref.TreeTime())
 	} else {
 		fuseStat(stat, fuse.S_IFDIR, 0, time.Now())
 	}
@@ -188,11 +186,16 @@ func (fs *Hubfs) Readdir(path string,
 		return
 	}
 
-	if nil != obs.ref {
-		stat := fuse.Stat_t{}
+	stat := fuse.Stat_t{}
+	if nil != obs.entry {
 		fuseStat(&stat, fuse.S_IFDIR, 0, obs.ref.TreeTime())
-		fill(".", &stat, 0)
-		fill("..", &stat, 0)
+	} else {
+		fuseStat(&stat, fuse.S_IFDIR, 0, time.Now())
+	}
+	fill(".", &stat, 0)
+	fill("..", &stat, 0)
+
+	if nil != obs.ref {
 		if lst, err := obs.repository.GetTree(obs.ref, obs.entry); nil == err {
 			for _, elm := range lst {
 				fuseStat(&stat, elm.Mode(), 0 /*elm.Size*/, obs.ref.TreeTime())
@@ -202,23 +205,28 @@ func (fs *Hubfs) Readdir(path string,
 			}
 		}
 	} else if nil != obs.repository {
-		stat := fuse.Stat_t{}
-		fuseStat(&stat, fuse.S_IFDIR, 0, time.Now())
-		fill(".", &stat, 0)
-		fill("..", &stat, 0)
 		if lst, err := obs.repository.GetRefs(); nil == err {
+			for _, elm := range lst {
+				r := elm.Name()
+				n := strings.TrimPrefix(r, "refs/heads/")
+				if r == n {
+					continue
+				}
+				if !fill(n, &stat, 0) {
+					break
+				}
+			}
+		}
+	} else if nil != obs.owner {
+		if lst, err := fs.client.GetRepositories(obs.owner); nil == err {
 			for _, elm := range lst {
 				if !fill(elm.Name(), &stat, 0) {
 					break
 				}
 			}
 		}
-	} else if nil != obs.owner {
-		stat := fuse.Stat_t{}
-		fuseStat(&stat, fuse.S_IFDIR, 0, time.Now())
-		fill(".", &stat, 0)
-		fill("..", &stat, 0)
-		if lst, err := fs.client.GetRepositories(obs.owner); nil == err {
+	} else {
+		if lst, err := fs.client.GetOwners(); nil == err {
 			for _, elm := range lst {
 				if !fill(elm.Name(), &stat, 0) {
 					break

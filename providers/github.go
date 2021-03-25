@@ -371,8 +371,11 @@ func (client *githubClient) OpenRepository(owner0 Owner, name string) (Repositor
 		client.cache.touchCacheItem(&res.cacheItem, +1)
 		return nil
 	})
+	if nil != err {
+		return nil, err
+	}
 
-	return res, err
+	return res, nil
 }
 
 func (client *githubClient) CloseRepository(repository Repository) {

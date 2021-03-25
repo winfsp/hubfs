@@ -174,7 +174,14 @@ func run() (ec int) {
 			if "debug" == s {
 				libtrace.Verbose = true
 				libtrace.Pattern = "github.com/billziss-gh/hubfs/*"
+				break
 			}
+		}
+
+		_, err = client.SetConfig([]string{"provider.dir=:"})
+		if nil != err {
+			warn("config error: %v", err)
+			return 1
 		}
 
 		config, err = client.SetConfig(config)
