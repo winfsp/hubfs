@@ -28,13 +28,14 @@ type Provider interface {
 }
 
 type Client interface {
+	SetConfig(config []string) ([]string, error)
 	GetOwners() ([]Owner, error)
 	OpenOwner(name string) (Owner, error)
 	CloseOwner(owner Owner)
 	GetRepositories(owner Owner) ([]Repository, error)
 	OpenRepository(owner Owner, name string) (Repository, error)
 	CloseRepository(repository Repository)
-	StartExpiration(timeToLive time.Duration)
+	StartExpiration()
 	StopExpiration()
 }
 

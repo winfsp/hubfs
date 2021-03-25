@@ -115,7 +115,7 @@ func TestOpenCloseRepository(t *testing.T) {
 }
 
 func testExpiration(t *testing.T) {
-	client.StartExpiration(1 * time.Second)
+	client.StartExpiration()
 	defer client.StopExpiration()
 
 	owner, err := client.OpenOwner(ownerName)
@@ -175,6 +175,8 @@ func init() {
 		if nil != err {
 			return err
 		}
+
+		client.SetConfig([]string{"provider.ttl=1s"})
 
 		return nil
 	})

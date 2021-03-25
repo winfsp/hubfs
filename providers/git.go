@@ -97,7 +97,7 @@ func (r *gitRepository) SetDirectory(path string) (err error) {
 
 func (r *gitRepository) RemoveDirectory() (err error) {
 	r.lock.Lock()
-	if "" != r.dir {
+	if "" == r.dir {
 		r.lock.Unlock()
 		return
 	}

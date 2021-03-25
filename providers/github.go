@@ -17,10 +17,14 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/billziss-gh/golib/appdata"
 	libcache "github.com/billziss-gh/golib/cache"
 	"github.com/billziss-gh/hubfs/httputil"
 	"github.com/cli/oauth"
@@ -76,6 +80,8 @@ type githubClient struct {
 	apiURI     string
 	token      string
 	login      string
+	dir        string
+	ttl        time.Duration
 	lock       sync.Mutex
 	cache      *cache
 	owners     *libcache.Map
@@ -122,6 +128,43 @@ func NewGithubClient(apiURI string, token string) (Client, error) {
 	}
 
 	return client, nil
+}
+
+func configValue(s string, k string, v *string) bool {
+	if len(s) >= len(k) && s[:len(k)] == k {
+		*v = s[len(k):]
+		return true
+	}
+	return false
+}
+
+func (client *githubClient) SetConfig(config []string) ([]string, error) {
+	res := []string{}
+	for _, s := range config {
+		v := ""
+		switch {
+		case configValue(s, "provider.dir=", &v):
+			if ":" == v {
+				if d, e := appdata.CacheDir(); nil == e {
+					if p, e := os.Executable(); nil == e {
+						if u, e := url.Parse(client.apiURI); nil == e {
+							n := strings.TrimSuffix(filepath.Base(p), ".exe")
+							v = filepath.Join(d, n, u.Hostname())
+						}
+					}
+				}
+			}
+			client.dir = v
+		case configValue(s, "provider.ttl=", &v):
+			if ttl, e := time.ParseDuration(v); nil == e && 0 < ttl {
+				client.ttl = ttl
+			}
+		default:
+			res = append(res, s)
+		}
+	}
+
+	return res, nil
 }
 
 func (client *githubClient) sendrecv(path string) (*http.Response, error) {
@@ -316,7 +359,14 @@ func (client *githubClient) OpenRepository(owner0 Owner, name string) (Repositor
 		}
 		res = item.Value.(*githubRepository)
 		if emptyRepository == res.Repository {
-			res.Repository = newGitRepository(res.FRemote, client.token)
+			r := newGitRepository(res.FRemote, client.token)
+			if "" != client.dir {
+				err = r.SetDirectory(filepath.Join(client.dir, owner.FName, name))
+				if nil != err {
+					return err
+				}
+			}
+			res.Repository = r
 		}
 		client.cache.touchCacheItem(&res.cacheItem, +1)
 		return nil
@@ -331,8 +381,12 @@ func (client *githubClient) CloseRepository(repository Repository) {
 	client.lock.Unlock()
 }
 
-func (client *githubClient) StartExpiration(timeToLive time.Duration) {
-	client.cache.startExpiration(timeToLive)
+func (client *githubClient) StartExpiration() {
+	ttl := 30 * time.Second
+	if 0 != client.ttl {
+		ttl = client.ttl
+	}
+	client.cache.startExpiration(ttl)
 }
 
 func (client *githubClient) StopExpiration() {
