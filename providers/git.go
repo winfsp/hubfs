@@ -424,7 +424,7 @@ func (r *gitRepository) ensureTree(
 	want = make([]string, 0, len(tree))
 	entm := make(map[string][]*gitTreeEntry, len(tree))
 	for _, e := range tree {
-		if 0040000 != e.entry.Mode {
+		if 0040000 != e.entry.Mode && 0160000 != e.entry.Mode {
 			want = append(want, e.entry.Hash)
 			entm[e.entry.Hash] = append(entm[e.entry.Hash], e)
 		}
