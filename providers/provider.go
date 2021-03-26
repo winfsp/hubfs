@@ -35,6 +35,7 @@ type Client interface {
 	GetRepositories(owner Owner) ([]Repository, error)
 	OpenRepository(owner Owner, name string) (Repository, error)
 	CloseRepository(repository Repository)
+	ResolveSubmodule(target string) string
 	StartExpiration()
 	StopExpiration()
 }

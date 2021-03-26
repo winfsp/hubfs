@@ -384,6 +384,18 @@ func (client *githubClient) CloseRepository(repository Repository) {
 	client.lock.Unlock()
 }
 
+func (client *githubClient) ResolveSubmodule(target string) string {
+	u0, e0 := url.Parse(client.apiURI)
+	u1, e1 := url.Parse(target)
+	if nil == e0 && nil == e1 {
+		if u0.Scheme == u1.Scheme && (u0.Host == u1.Host || u0.Host == "api."+u1.Host) &&
+			strings.HasSuffix(u1.Path, ".git") {
+			return strings.TrimSuffix(u1.Path, ".git")
+		}
+	}
+	return target
+}
+
 func (client *githubClient) StartExpiration() {
 	ttl := 30 * time.Second
 	if 0 != client.ttl {

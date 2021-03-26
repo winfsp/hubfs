@@ -150,7 +150,7 @@ func (fs *Hubfs) getmodule(obs *obstack, path string) (errc int, module string) 
 		p := s["path"]
 		u := s["url"]
 		if "" != p && "" != u {
-			modules[p] = u
+			modules[p] = fs.client.ResolveSubmodule(u)
 		}
 	}
 
