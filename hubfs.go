@@ -14,7 +14,6 @@ package main
 
 import (
 	"io"
-	"io/ioutil"
 	"path"
 	"strings"
 	"sync"
@@ -49,7 +48,7 @@ func fuseErrc(err error) (errc int) {
 	return
 }
 
-func fuseStat(stat *fuse.Stat_t, mode uint32, size int, time time.Time) {
+func fuseStat(stat *fuse.Stat_t, mode uint32, size int64, time time.Time) {
 	switch mode & fuse.S_IFMT {
 	case fuse.S_IFDIR:
 		mode = (mode & fuse.S_IFMT) | 0755
@@ -65,7 +64,7 @@ func fuseStat(stat *fuse.Stat_t, mode uint32, size int, time time.Time) {
 	*stat = fuse.Stat_t{
 		Mode:     mode,
 		Nlink:    1,
-		Size:     int64(size),
+		Size:     size,
 		Atim:     ts,
 		Mtim:     ts,
 		Ctim:     ts,
@@ -121,7 +120,7 @@ func (fs *Hubfs) Getattr(path string, stat *fuse.Stat_t, fh uint64) (errc int) {
 	}
 
 	if nil != obs.entry {
-		fuseStat(stat, obs.entry.Mode(), 0 /* elm.Size*/, obs.ref.TreeTime())
+		fuseStat(stat, obs.entry.Mode(), obs.entry.Size(), obs.ref.TreeTime())
 	} else {
 		fuseStat(stat, fuse.S_IFDIR, 0, time.Now())
 	}
@@ -137,20 +136,12 @@ func (fs *Hubfs) Readlink(path string) (errc int, target string) {
 		return
 	}
 
+	errc = -fuse.EINVAL
 	if nil != obs.entry && fuse.S_IFLNK == obs.entry.Mode()&fuse.S_IFMT {
-		reader, err := obs.repository.GetBlobReader(obs.entry)
-		if nil == err {
-			bytes, err := ioutil.ReadAll(reader.(io.Reader))
-			if nil == err {
-				target = string(bytes)
-			}
+		target = obs.entry.Target()
+		if "" != target {
+			errc = 0
 		}
-		if nil != err {
-			errc = -fuse.EIO
-			return
-		}
-	} else {
-		errc = -fuse.EINVAL
 	}
 
 	fs.release(obs)
@@ -198,7 +189,7 @@ func (fs *Hubfs) Readdir(path string,
 	if nil != obs.ref {
 		if lst, err := obs.repository.GetTree(obs.ref, obs.entry); nil == err {
 			for _, elm := range lst {
-				fuseStat(&stat, elm.Mode(), 0 /*elm.Size*/, obs.ref.TreeTime())
+				fuseStat(&stat, elm.Mode(), elm.Size(), obs.ref.TreeTime())
 				if !fill(elm.Name(), &stat, 0) {
 					break
 				}

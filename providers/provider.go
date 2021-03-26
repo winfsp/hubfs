@@ -63,6 +63,8 @@ type Ref interface {
 type TreeEntry interface {
 	Name() string
 	Mode() uint32
+	Size() int64
+	Target() string
 	Hash() string
 }
 

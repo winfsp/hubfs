@@ -43,8 +43,10 @@ type gitRef struct {
 }
 
 type gitTreeEntry struct {
-	entry git.TreeEntry
-	tree  map[string]*gitTreeEntry
+	entry  git.TreeEntry
+	size   int64
+	target string
+	tree   map[string]*gitTreeEntry
 }
 
 func NewGitRepository(remote string, token string) (Repository, error) {
@@ -142,8 +144,59 @@ func containsString(l []string, s string) bool {
 	return false
 }
 
+func (r *gitRepository) prefetchObjects(dir string, want []string,
+	fn func(hash string, size int64) error) error {
+
+	if 0 == len(want) {
+		return nil
+	}
+
+	if "" != dir {
+		w := make([]string, 0, len(want))
+		for _, hash := range want {
+			info, err := os.Stat(objectPath(dir, hash))
+			if nil != err {
+				w = append(w, hash)
+			} else {
+				err = fn(hash, info.Size())
+				if nil != err {
+					return err
+				}
+			}
+		}
+
+		want = w
+		if 0 == len(want) {
+			return nil
+		}
+
+		return r.repo.FetchObjects(want, func(hash string, ot git.ObjectType, content []byte) error {
+			writeObject(dir, hash, content)
+			if !containsString(want, hash) {
+				return nil
+			}
+			info, err := os.Stat(objectPath(dir, hash))
+			if nil != err {
+				return err
+			}
+			return fn(hash, info.Size())
+		})
+	} else {
+		return r.repo.FetchObjects(want, func(hash string, ot git.ObjectType, content []byte) error {
+			if !containsString(want, hash) {
+				return nil
+			}
+			return fn(hash, int64(len(content)))
+		})
+	}
+}
+
 func (r *gitRepository) fetchObjects(dir string, want []string,
 	fn func(hash string, content []byte) error) error {
+
+	if 0 == len(want) {
+		return nil
+	}
 
 	if "" != dir {
 		w := make([]string, 0, len(want))
@@ -196,6 +249,10 @@ func (readerAtNopCloser) Close() error {
 
 func (r *gitRepository) fetchReaders(dir string, want []string,
 	fn func(hash string, reader io.ReaderAt) error) error {
+
+	if 0 == len(want) {
+		return nil
+	}
 
 	if "" != dir {
 		w := make([]string, 0, len(want))
@@ -364,6 +421,49 @@ func (r *gitRepository) ensureTree(
 		return err
 	}
 
+	want = make([]string, 0, len(tree))
+	entm := make(map[string][]*gitTreeEntry, len(tree))
+	for _, e := range tree {
+		if 0040000 != e.entry.Mode {
+			want = append(want, e.entry.Hash)
+			entm[e.entry.Hash] = append(entm[e.entry.Hash], e)
+		}
+	}
+	err = r.prefetchObjects(dir, want, func(hash string, size int64) error {
+		l, ok := entm[hash]
+		if ok {
+			for _, e := range l {
+				e.size = size
+			}
+		}
+		return nil
+	})
+	if nil != err {
+		return err
+	}
+
+	want = make([]string, 0, len(tree))
+	entm = make(map[string][]*gitTreeEntry, len(tree))
+	for _, e := range tree {
+		if 0120000 == e.entry.Mode {
+			want = append(want, e.entry.Hash)
+			entm[e.entry.Hash] = append(entm[e.entry.Hash], e)
+		}
+	}
+	err = r.fetchObjects(dir, want, func(hash string, content []byte) error {
+		l, ok := entm[hash]
+		if ok {
+			t := string(content)
+			for _, e := range l {
+				e.target = t
+			}
+		}
+		return nil
+	})
+	if nil != err {
+		return err
+	}
+
 	r.lock.Lock()
 	if nil == entry {
 		if nil == ref.tree {
@@ -438,6 +538,14 @@ func (e *gitTreeEntry) Name() string {
 
 func (e *gitTreeEntry) Mode() uint32 {
 	return e.entry.Mode
+}
+
+func (e *gitTreeEntry) Size() int64 {
+	return e.size
+}
+
+func (e *gitTreeEntry) Target() string {
+	return e.target
 }
 
 func (e *gitTreeEntry) Hash() string {
