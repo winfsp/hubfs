@@ -342,15 +342,23 @@ func (fs *Hubfs) Read(path string, buff []byte, ofst int64, fh uint64) (n int) {
 	}
 
 	if nil == reader {
-		fs.lock.Lock()
-		if nil == obs.reader {
-			obs.reader, _ = obs.repository.GetBlobReader(obs.entry)
-		}
-		reader = obs.reader
-		fs.lock.Unlock()
+		reader, _ = obs.repository.GetBlobReader(obs.entry)
 		if nil == reader {
 			n = -fuse.EIO
 			return
+		}
+
+		var closer io.Closer
+		fs.lock.Lock()
+		if nil == obs.reader {
+			obs.reader = reader
+		} else {
+			closer = reader.(io.Closer)
+			reader = obs.reader
+		}
+		fs.lock.Unlock()
+		if nil != closer {
+			closer.Close()
 		}
 	}
 
