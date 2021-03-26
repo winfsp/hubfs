@@ -92,7 +92,11 @@ func (fs *Hubfs) open(path string) (errc int, res *obstack) {
 		case 1:
 			obs.repository, err = fs.client.OpenRepository(obs.owner, c)
 		case 2:
+			c = strings.ReplaceAll(c, " ", "/")
 			obs.ref, err = obs.repository.GetRef("refs/heads/" + c)
+			if providers.ErrNotFound == err {
+				obs.ref, err = obs.repository.GetRef("refs/tags/" + c)
+			}
 		default:
 			obs.entry, err = obs.repository.GetTreeEntry(obs.ref, obs.entry, c)
 		}
@@ -269,6 +273,7 @@ func (fs *Hubfs) Readdir(path string,
 				if r == n {
 					continue
 				}
+				n = strings.ReplaceAll(n, "/", " ")
 				if !fill(n, &stat, 0) {
 					break
 				}
