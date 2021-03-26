@@ -14,6 +14,7 @@ package providers
 
 import (
 	"bytes"
+	"encoding/hex"
 	"io"
 	"io/ioutil"
 	"os"
@@ -234,6 +235,31 @@ func (r *gitRepository) fetchObjects(dir string, want []string,
 	}
 }
 
+func (r *gitRepository) refetchObjects(dir string, want []string,
+	fn func(hash string, ot git.ObjectType) error) error {
+
+	if 0 == len(want) {
+		return nil
+	}
+
+	if "" != dir {
+		return r.repo.FetchObjects(want, func(hash string, ot git.ObjectType, content []byte) error {
+			writeObject(dir, hash, content)
+			if !containsString(want, hash) {
+				return nil
+			}
+			return fn(hash, ot)
+		})
+	} else {
+		return r.repo.FetchObjects(want, func(hash string, ot git.ObjectType, content []byte) error {
+			if !containsString(want, hash) {
+				return nil
+			}
+			return fn(hash, ot)
+		})
+	}
+}
+
 type readerAt interface {
 	io.Reader
 	io.ReaderAt
@@ -358,6 +384,49 @@ func (r *gitRepository) GetRef(name string) (res Ref, err error) {
 		return nil
 	})
 	return
+}
+
+func (r *gitRepository) GetTempRef(name string) (res Ref, err error) {
+	_, err = hex.DecodeString(name)
+	if nil != err {
+		return nil, ErrNotFound
+	}
+
+	err = r.ensureRefs(func(refs map[string]*gitRef) error {
+		var ok bool
+		res, ok = refs[name]
+		if !ok {
+			return ErrNotFound
+		}
+		return nil
+	})
+	if nil == err {
+		return
+	}
+
+	r.lock.RLock()
+	dir := r.dir
+	r.lock.RUnlock()
+
+	err = r.refetchObjects(dir, []string{name}, func(hash string, ot git.ObjectType) error {
+		if git.CommitObject != ot {
+			return ErrNotFound
+		}
+		return nil
+	})
+	if nil != err {
+		return
+	}
+
+	ref := &gitRef{
+		name:       name,
+		commitHash: name,
+	}
+	r.lock.Lock()
+	r.refs[name] = ref
+	r.lock.Unlock()
+
+	return ref, nil
 }
 
 func (r *gitRepository) ensureTree(

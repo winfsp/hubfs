@@ -26,6 +26,7 @@ const refName = "refs/heads/master"
 const entryName = "main.go"
 const subtreeName = "providers"
 const subentryName = "provider.go"
+const commitName = "865aad06c4ecde192460b429f810bb84c0d9ca7b"
 
 var repository Repository
 
@@ -75,6 +76,24 @@ func TestGetRef(t *testing.T) {
 		t.Error(err)
 	}
 	if ref.Name() != refName {
+		t.Error()
+	}
+}
+
+func TestGetTempRef(t *testing.T) {
+	ref, err := repository.GetTempRef(commitName)
+	if nil != err {
+		t.Error(err)
+	}
+	if ref.Name() != commitName {
+		t.Error()
+	}
+
+	ref, err = repository.GetTempRef(commitName)
+	if nil != err {
+		t.Error(err)
+	}
+	if ref.Name() != commitName {
 		t.Error()
 	}
 }

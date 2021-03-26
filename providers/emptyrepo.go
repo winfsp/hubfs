@@ -51,6 +51,10 @@ func (*emptyRepositoryT) GetRef(name string) (Ref, error) {
 	return nil, ErrNotFound
 }
 
+func (*emptyRepositoryT) GetTempRef(name string) (Ref, error) {
+	return nil, ErrNotFound
+}
+
 func (*emptyRepositoryT) GetTree(ref Ref, entry TreeEntry) ([]TreeEntry, error) {
 	return []TreeEntry{}, nil
 }

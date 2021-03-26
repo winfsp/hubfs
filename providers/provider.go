@@ -51,6 +51,7 @@ type Repository interface {
 	Name() string
 	GetRefs() ([]Ref, error)
 	GetRef(name string) (Ref, error)
+	GetTempRef(name string) (Ref, error)
 	GetTree(ref Ref, entry TreeEntry) ([]TreeEntry, error)
 	GetTreeEntry(ref Ref, entry TreeEntry, name string) (TreeEntry, error)
 	GetBlobReader(entry TreeEntry) (io.ReaderAt, error)
