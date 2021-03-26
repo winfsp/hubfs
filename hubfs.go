@@ -51,9 +51,9 @@ func fuseErrc(err error) (errc int) {
 func fuseStat(stat *fuse.Stat_t, mode uint32, size int64, time time.Time) {
 	switch mode & fuse.S_IFMT {
 	case fuse.S_IFDIR:
-		mode = (mode & fuse.S_IFMT) | 0755
-	case fuse.S_IFLNK:
-		mode = (mode & fuse.S_IFMT) | 0777
+		mode = fuse.S_IFDIR | 0755
+	case fuse.S_IFLNK, 0160000 /* submodule */ :
+		mode = fuse.S_IFLNK | 0777
 	default:
 		mode = fuse.S_IFREG | 0644
 		if 0 != mode&0400 {
@@ -136,12 +136,15 @@ func (fs *Hubfs) Readlink(path string) (errc int, target string) {
 		return
 	}
 
-	errc = -fuse.EINVAL
-	if nil != obs.entry && fuse.S_IFLNK == obs.entry.Mode()&fuse.S_IFMT {
-		target = obs.entry.Target()
-		if "" != target {
-			errc = 0
+	if nil != obs.entry {
+		switch obs.entry.Mode() & fuse.S_IFMT {
+		case fuse.S_IFLNK, 0160000 /* submodule */ :
+			target = obs.entry.Target()
 		}
+	}
+
+	if "" == target {
+		errc = -fuse.EINVAL
 	}
 
 	fs.release(obs)

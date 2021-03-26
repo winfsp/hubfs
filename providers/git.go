@@ -448,6 +448,9 @@ func (r *gitRepository) ensureTree(
 		if 0120000 == e.entry.Mode {
 			want = append(want, e.entry.Hash)
 			entm[e.entry.Hash] = append(entm[e.entry.Hash], e)
+		} else if 0160000 == e.entry.Mode {
+			e.target = e.entry.Hash
+			e.size = int64(len(e.target))
 		}
 	}
 	err = r.fetchObjects(dir, want, func(hash string, content []byte) error {
