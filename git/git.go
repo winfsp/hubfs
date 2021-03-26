@@ -181,7 +181,7 @@ func (obs *observer) OnFooter(h plumbing.Hash) error {
 	return nil
 }
 
-func (repository *Repository) FetchObjects(wants []string,
+func (repository *Repository) fetchObjects(wants []string,
 	fn func(hash string, ot ObjectType, content []byte) error) (err error) {
 	defer trace(len(wants))(&err)
 
@@ -230,6 +230,23 @@ func (repository *Repository) FetchObjects(wants []string,
 	_, err = parser.Parse()
 	if nil != err {
 		return err
+	}
+
+	return nil
+}
+
+func (repository *Repository) FetchObjects(wants []string,
+	fn func(hash string, ot ObjectType, content []byte) error) (err error) {
+
+	for i, j := 0, 0; len(wants) > i; i = j {
+		j = i + 256
+		if len(wants) < j {
+			j = len(wants)
+		}
+		err = repository.fetchObjects(wants[i:j], fn)
+		if nil != err {
+			return err
+		}
 	}
 
 	return nil
