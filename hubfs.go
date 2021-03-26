@@ -14,12 +14,13 @@ package main
 
 import (
 	"io"
-	"path"
+	pathutil "path"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/billziss-gh/cgofuse/fuse"
+	"github.com/billziss-gh/golib/config"
 	"github.com/billziss-gh/hubfs/providers"
 )
 
@@ -28,6 +29,7 @@ type Hubfs struct {
 	client  providers.Client
 	prefix  string
 	lock    sync.RWMutex
+	modules map[string]string
 	fh      uint64
 	openmap map[uint64]*obstack
 }
@@ -80,10 +82,10 @@ func split(path string) []string {
 	return comp
 }
 
-func (fs *Hubfs) open(p string) (errc int, res *obstack) {
+func (fs *Hubfs) open(path string) (errc int, res *obstack) {
 	obs := &obstack{}
 	var err error
-	for i, c := range split(path.Join(fs.prefix, p)) {
+	for i, c := range split(pathutil.Join(fs.prefix, path)) {
 		switch i {
 		case 0:
 			obs.owner, err = fs.client.OpenOwner(c)
@@ -113,17 +115,74 @@ func (fs *Hubfs) release(obs *obstack) {
 	}
 }
 
+func (fs *Hubfs) getmodule(obs *obstack, path string) (errc int, module string) {
+	path = strings.Join(split(pathutil.Join(fs.prefix, path))[3:], "/")
+
+	fs.lock.RLock()
+	if nil != fs.modules {
+		module = fs.modules[path]
+		fs.lock.RUnlock()
+		return
+	}
+	fs.lock.RUnlock()
+
+	entry, err := obs.repository.GetTreeEntry(obs.ref, nil, ".gitmodules")
+	if nil != err {
+		errc = -fuse.EIO
+		return
+	}
+
+	reader, err := obs.repository.GetBlobReader(entry)
+	if nil != err {
+		errc = -fuse.EIO
+		return
+	}
+
+	c, err := config.Read(reader.(io.Reader))
+	reader.(io.Closer).Close()
+	if nil != err {
+		errc = -fuse.EIO
+		return
+	}
+
+	modules := make(map[string]string)
+	for _, s := range c {
+		p := s["path"]
+		u := s["url"]
+		if "" != p && "" != u {
+			modules[p] = u
+		}
+	}
+
+	fs.lock.Lock()
+	if nil == fs.modules {
+		fs.modules = modules
+	}
+	module = fs.modules[path]
+	fs.lock.Unlock()
+	return
+}
+
+func (fs *Hubfs) getattr(obs *obstack, entry providers.TreeEntry, path string, stat *fuse.Stat_t) {
+	if nil != entry {
+		mode := entry.Mode()
+		fuseStat(stat, mode, entry.Size(), obs.ref.TreeTime())
+		if 0160000 == mode {
+			_, module := fs.getmodule(obs, path)
+			stat.Size += int64(len(module)) + 1
+		}
+	} else {
+		fuseStat(stat, fuse.S_IFDIR, 0, time.Now())
+	}
+}
+
 func (fs *Hubfs) Getattr(path string, stat *fuse.Stat_t, fh uint64) (errc int) {
 	errc, obs := fs.open(path)
 	if 0 != errc {
 		return
 	}
 
-	if nil != obs.entry {
-		fuseStat(stat, obs.entry.Mode(), obs.entry.Size(), obs.ref.TreeTime())
-	} else {
-		fuseStat(stat, fuse.S_IFDIR, 0, time.Now())
-	}
+	fs.getattr(obs, obs.entry, path, stat)
 
 	fs.release(obs)
 
@@ -138,8 +197,11 @@ func (fs *Hubfs) Readlink(path string) (errc int, target string) {
 
 	if nil != obs.entry {
 		switch obs.entry.Mode() & fuse.S_IFMT {
-		case fuse.S_IFLNK, 0160000 /* submodule */ :
+		case fuse.S_IFLNK:
 			target = obs.entry.Target()
+		case 0160000 /* submodule */ :
+			_, module := fs.getmodule(obs, path)
+			target = module + "/" + obs.entry.Target()
 		}
 	}
 
@@ -192,8 +254,9 @@ func (fs *Hubfs) Readdir(path string,
 	if nil != obs.ref {
 		if lst, err := obs.repository.GetTree(obs.ref, obs.entry); nil == err {
 			for _, elm := range lst {
-				fuseStat(&stat, elm.Mode(), elm.Size(), obs.ref.TreeTime())
-				if !fill(elm.Name(), &stat, 0) {
+				n := elm.Name()
+				fs.getattr(obs, elm, pathutil.Join(path, n), &stat)
+				if !fill(n, &stat, 0) {
 					break
 				}
 			}
