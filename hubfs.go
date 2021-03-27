@@ -21,6 +21,7 @@ import (
 
 	"github.com/billziss-gh/cgofuse/fuse"
 	"github.com/billziss-gh/golib/config"
+	libtrace "github.com/billziss-gh/golib/trace"
 	"github.com/billziss-gh/hubfs/providers"
 )
 
@@ -196,6 +197,8 @@ func (fs *Hubfs) getattr(obs *obstack, entry providers.TreeEntry, path string, s
 }
 
 func (fs *Hubfs) Getattr(path string, stat *fuse.Stat_t, fh uint64) (errc int) {
+	defer trace(path, fh)(&errc, stat)
+
 	resolve := strings.HasSuffix(path, "/.")
 
 retry:
@@ -221,6 +224,8 @@ retry:
 }
 
 func (fs *Hubfs) Readlink(path string) (errc int, target string) {
+	defer trace(path)(&errc, &target)
+
 	errc, obs := fs.open(path)
 	if 0 != errc {
 		return
@@ -248,6 +253,8 @@ func (fs *Hubfs) Readlink(path string) (errc int, target string) {
 }
 
 func (fs *Hubfs) Opendir(path string) (errc int, fh uint64) {
+	defer trace(path)(&errc, &fh)
+
 	errc, obs := fs.open(path)
 	if 0 != errc {
 		return
@@ -266,6 +273,7 @@ func (fs *Hubfs) Readdir(path string,
 	fill func(name string, stat *fuse.Stat_t, ofst int64) bool,
 	ofst int64,
 	fh uint64) (errc int) {
+	defer trace(path, fill, ofst, fh)(&errc)
 
 	fs.lock.RLock()
 	obs, ok := fs.openmap[fh]
@@ -330,6 +338,8 @@ func (fs *Hubfs) Readdir(path string,
 }
 
 func (fs *Hubfs) Releasedir(path string, fh uint64) (errc int) {
+	defer trace(path, fh)(&errc)
+
 	fs.lock.Lock()
 	obs, ok := fs.openmap[fh]
 	if ok {
@@ -347,6 +357,8 @@ func (fs *Hubfs) Releasedir(path string, fh uint64) (errc int) {
 }
 
 func (fs *Hubfs) Open(path string, flags int) (errc int, fh uint64) {
+	defer trace(path, flags)(&errc, &fh)
+
 	errc, obs := fs.open(path)
 	if 0 != errc {
 		return
@@ -362,6 +374,8 @@ func (fs *Hubfs) Open(path string, flags int) (errc int, fh uint64) {
 }
 
 func (fs *Hubfs) Read(path string, buff []byte, ofst int64, fh uint64) (n int) {
+	defer trace(path, buff, ofst, fh)(&n)
+
 	var reader io.ReaderAt
 
 	fs.lock.RLock()
@@ -406,6 +420,8 @@ func (fs *Hubfs) Read(path string, buff []byte, ofst int64, fh uint64) (n int) {
 }
 
 func (fs *Hubfs) Release(path string, fh uint64) (errc int) {
+	defer trace(path, fh)(&errc)
+
 	fs.lock.Lock()
 	obs, ok := fs.openmap[fh]
 	if ok {
@@ -443,4 +459,8 @@ func Mount(client providers.Client, prefix string, mntpnt string, config []strin
 	host := fuse.NewFileSystemHost(fs)
 	host.SetCapReaddirPlus(true)
 	return host.Mount(mntpnt, mntopt)
+}
+
+func trace(vals ...interface{}) func(vals ...interface{}) {
+	return libtrace.Trace(1, "", vals...)
 }

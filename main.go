@@ -173,7 +173,7 @@ func run() (ec int) {
 		for _, s := range config {
 			if "debug" == s {
 				libtrace.Verbose = true
-				libtrace.Pattern = "github.com/billziss-gh/hubfs/*"
+				libtrace.Pattern = "*,github.com/billziss-gh/hubfs/*"
 				break
 			}
 		}
