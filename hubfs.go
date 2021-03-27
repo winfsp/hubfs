@@ -96,6 +96,9 @@ func (fs *Hubfs) open(path string) (errc int, res *obstack) {
 			obs.ref, err = obs.repository.GetRef("refs/heads/" + c)
 			if providers.ErrNotFound == err {
 				obs.ref, err = obs.repository.GetRef("refs/tags/" + c)
+				if providers.ErrNotFound == err {
+					obs.ref, err = obs.repository.GetTempRef(c)
+				}
 			}
 		default:
 			obs.entry, err = obs.repository.GetTreeEntry(obs.ref, obs.entry, c)
@@ -167,28 +170,52 @@ func (fs *Hubfs) getmodule(obs *obstack, path string) (errc int, module string) 
 	return
 }
 
-func (fs *Hubfs) getattr(obs *obstack, entry providers.TreeEntry, path string, stat *fuse.Stat_t) {
+func (fs *Hubfs) getattr(obs *obstack, entry providers.TreeEntry, path string, stat *fuse.Stat_t) (
+	target string) {
+
 	if nil != entry {
 		mode := entry.Mode()
 		fuseStat(stat, mode, entry.Size(), obs.ref.TreeTime())
-		if 0160000 == mode {
-			_, module := fs.getmodule(obs, path)
-			stat.Size += int64(len(module)) + 1
+		switch mode & fuse.S_IFMT {
+		case fuse.S_IFLNK:
+			target = obs.entry.Target()
+			stat.Size = int64(len(target))
+		case 0160000 /* submodule */ :
+			target = obs.entry.Target()
+			e, module := fs.getmodule(obs, path)
+			if 0 == e {
+				target = module + "/" + obs.entry.Target()
+			}
+			stat.Size = int64(len(target))
 		}
 	} else {
 		fuseStat(stat, fuse.S_IFDIR, 0, time.Now())
 	}
+
+	return
 }
 
 func (fs *Hubfs) Getattr(path string, stat *fuse.Stat_t, fh uint64) (errc int) {
+	resolve := strings.HasSuffix(path, "/.")
+
+retry:
 	errc, obs := fs.open(path)
 	if 0 != errc {
 		return
 	}
 
-	fs.getattr(obs, obs.entry, path, stat)
+	target := fs.getattr(obs, obs.entry, path, stat)
 
 	fs.release(obs)
+
+	if resolve && "" != target {
+		if '/' == target[0] {
+			path = target
+		} else {
+			path = pathutil.Join(path, "..", target)
+		}
+		goto retry
+	}
 
 	return
 }

@@ -437,7 +437,10 @@ func (r *gitRepository) ensureTree(
 	}
 
 	ref, _ := ref0.(*gitRef)
-	entry, _ := entry0.(*gitTreeEntry)
+	entry, ok := entry0.(*gitTreeEntry)
+	if ok && 0040000 != entry.entry.Mode {
+		return ErrNotFound
+	}
 
 	r.lock.RLock()
 	if nil == entry {
