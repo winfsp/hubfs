@@ -273,7 +273,7 @@ func (fs *Hubfs) Readdir(path string,
 	fill func(name string, stat *fuse.Stat_t, ofst int64) bool,
 	ofst int64,
 	fh uint64) (errc int) {
-	defer trace(path, fill, ofst, fh)(&errc)
+	defer trace(path, ofst, fh)(&errc)
 
 	fs.lock.RLock()
 	obs, ok := fs.openmap[fh]
@@ -374,7 +374,7 @@ func (fs *Hubfs) Open(path string, flags int) (errc int, fh uint64) {
 }
 
 func (fs *Hubfs) Read(path string, buff []byte, ofst int64, fh uint64) (n int) {
-	defer trace(path, buff, ofst, fh)(&n)
+	defer trace(path, ofst, fh)(&n)
 
 	var reader io.ReaderAt
 
