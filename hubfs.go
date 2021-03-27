@@ -201,6 +201,35 @@ func (fs *Hubfs) getattr(obs *obstack, entry providers.TreeEntry, path string, s
 func (fs *Hubfs) Getattr(path string, stat *fuse.Stat_t, fh uint64) (errc int) {
 	defer trace(path, fh)(&errc, stat)
 
+	// The resolve logic below is specific to Windows and WinFsp. An
+	// explanation follows.
+	//
+	// On Windows symbolic links (symlinks) are marked as directory symlinks
+	// or file symlinks. This is important for some apps on Windows; for
+	// example CMD.EXE is unable to properly CD into a symlink that points to
+	// a directory if the symlink is not marked as a directory symlink.
+	//
+	// When WinFsp-FUSE (the FUSE layer of WinFsp) issues Getattr and sees a
+	// symlink it must also inform Windows if it is a directory (see above).
+	// At the time I was writing the WinFsp-FUSE layer I got a bit lazy: I
+	// should have written the code to issue all the necessary Readlink calls
+	// to properly resolve the symlink and then issue Getattr on the result.
+	// Instead I punted on this and wrote simple logic to issue a Getattr on
+	// the original path+"/." and expected the file system to deal with it.
+	//
+	// WinFsp-FUSE will only ever send path+"/." in this particular case. The
+	// file system is supposed to fill the Stat_t struct with the appropriate
+	// file mode that shows whether the (pointed) file is a directory. WinFsp-
+	// FUSE will then mark the symlink appropriately.
+	//
+	// Our resolve logic below works well for the case where the last path
+	// component is a symlink. This covers the important use case of
+	// submodules. However the logic does not currently handle cases where
+	// a symlink is at the middle of the path:
+	//
+	// path = /name/.../name/LINK        --resolves-to->
+	// path = /name/.../name/LINK/name/.../name
+
 	resolve := strings.HasSuffix(path, "/.")
 
 retry:
