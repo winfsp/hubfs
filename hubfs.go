@@ -184,8 +184,10 @@ func (fs *Hubfs) getattr(obs *obstack, entry providers.TreeEntry, path string, s
 		case 0160000 /* submodule */ :
 			target = entry.Target()
 			e, module := fs.getmodule(obs, path)
-			if 0 == e {
+			if "" != module {
 				target = module + "/" + entry.Target()
+			} else {
+				tracef("getmodule(%#v) is empty (error %d)", path, e)
 			}
 			stat.Size = int64(len(target))
 		}
@@ -231,18 +233,8 @@ func (fs *Hubfs) Readlink(path string) (errc int, target string) {
 		return
 	}
 
-	if nil != obs.entry {
-		switch obs.entry.Mode() & fuse.S_IFMT {
-		case fuse.S_IFLNK:
-			target = obs.entry.Target()
-		case 0160000 /* submodule */ :
-			e, module := fs.getmodule(obs, path)
-			if 0 == e {
-				target = module + "/" + obs.entry.Target()
-			}
-		}
-	}
-
+	stat := fuse.Stat_t{}
+	target = fs.getattr(obs, obs.entry, path, &stat)
 	if "" == target {
 		errc = -fuse.EINVAL
 	}
@@ -463,4 +455,8 @@ func Mount(client providers.Client, prefix string, mntpnt string, config []strin
 
 func trace(vals ...interface{}) func(vals ...interface{}) {
 	return libtrace.Trace(1, "", vals...)
+}
+
+func tracef(form string, vals ...interface{}) {
+	libtrace.Tracef(1, form, vals...)
 }
