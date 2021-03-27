@@ -231,8 +231,10 @@ func (fs *Hubfs) Readlink(path string) (errc int, target string) {
 		case fuse.S_IFLNK:
 			target = obs.entry.Target()
 		case 0160000 /* submodule */ :
-			_, module := fs.getmodule(obs, path)
-			target = module + "/" + obs.entry.Target()
+			e, module := fs.getmodule(obs, path)
+			if 0 == e {
+				target = module + "/" + obs.entry.Target()
+			}
 		}
 	}
 
