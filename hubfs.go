@@ -179,13 +179,13 @@ func (fs *Hubfs) getattr(obs *obstack, entry providers.TreeEntry, path string, s
 		fuseStat(stat, mode, entry.Size(), obs.ref.TreeTime())
 		switch mode & fuse.S_IFMT {
 		case fuse.S_IFLNK:
-			target = obs.entry.Target()
+			target = entry.Target()
 			stat.Size = int64(len(target))
 		case 0160000 /* submodule */ :
-			target = obs.entry.Target()
+			target = entry.Target()
 			e, module := fs.getmodule(obs, path)
 			if 0 == e {
-				target = module + "/" + obs.entry.Target()
+				target = module + "/" + entry.Target()
 			}
 			stat.Size = int64(len(target))
 		}
