@@ -227,8 +227,8 @@ func (fs *Hubfs) Getattr(path string, stat *fuse.Stat_t, fh uint64) (errc int) {
 	// submodules. However the logic does not currently handle cases where
 	// a symlink is at the middle of the path:
 	//
-	// path = /name/.../name/LINK        --resolves-to->
-	// path = /name/.../name/LINK/name/.../name
+	// path = /name/.../name/LINK/.                 --resolves-to->
+	// path = /name/.../name/LINK/name/.../name     --resolves-to-> ?
 
 	resolve := strings.HasSuffix(path, "/.")
 
