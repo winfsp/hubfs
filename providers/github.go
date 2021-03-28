@@ -414,6 +414,16 @@ func (o *githubOwner) Name() string {
 
 func (o *githubOwner) expire(c *cache, currentTime time.Time) bool {
 	return c.expireCacheItem(&o.cacheItem, currentTime, func() {
+		if nil != o.repositories {
+			for _, elm := range o.repositories.Items() {
+				r := elm.Value.(*githubRepository)
+				if emptyRepository != r.Repository {
+					// do not expire Owner that has unexpired repositories
+					return
+				}
+			}
+		}
+
 		client := c.Value.(*githubClient)
 		client.owners.Delete(o.FName)
 		tracef("%s", o.FName)
@@ -426,11 +436,15 @@ func (r *githubRepository) Name() string {
 
 func (r *githubRepository) expire(c *cache, currentTime time.Time) bool {
 	return c.expireCacheItem(&r.cacheItem, currentTime, func() {
-		if emptyRepository != r.Repository {
-			r.Close()
-			r.RemoveDirectory()
-			r.Repository = emptyRepository
-			tracef("%s", r.FRemote)
+		if emptyRepository == r.Repository {
+			return
 		}
+
+		err := r.RemoveDirectory()
+		if nil == err {
+			r.Close()
+			r.Repository = emptyRepository
+		}
+		tracef("%s (error %v)", r.FRemote, err)
 	})
 }
