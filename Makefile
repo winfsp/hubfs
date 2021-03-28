@@ -15,3 +15,7 @@ default: build
 .PHONY: build
 build:
 	go build -ldflags "-s -w -X \"main.MyVersion=$(MyVersion)\"" -o hubfs$(ExeSuffix)
+
+.PHONY: racy
+racy:
+	go build -race -o hubfs$(ExeSuffix)
