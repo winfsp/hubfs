@@ -137,7 +137,7 @@ func testExpiration(t *testing.T) {
 	client.CloseRepository(repository)
 	client.CloseOwner(owner)
 
-	time.Sleep(2 * time.Second)
+	time.Sleep(3 * time.Second)
 
 	owner, err = client.OpenOwner(ownerName)
 	if nil != err {
