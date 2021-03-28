@@ -416,6 +416,7 @@ func (o *githubOwner) expire(c *cache, currentTime time.Time) bool {
 	return c.expireCacheItem(&o.cacheItem, currentTime, func() {
 		client := c.Value.(*githubClient)
 		client.owners.Delete(o.FName)
+		tracef("%s", o.FName)
 	})
 }
 
@@ -425,8 +426,11 @@ func (r *githubRepository) Name() string {
 
 func (r *githubRepository) expire(c *cache, currentTime time.Time) bool {
 	return c.expireCacheItem(&r.cacheItem, currentTime, func() {
-		r.Close()
-		r.RemoveDirectory()
-		r.Repository = emptyRepository
+		if emptyRepository != r.Repository {
+			r.Close()
+			r.RemoveDirectory()
+			r.Repository = emptyRepository
+			tracef("%s", r.FRemote)
+		}
 	})
 }

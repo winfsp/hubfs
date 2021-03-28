@@ -98,3 +98,7 @@ func RegisterProvider(name string, provider Provider) {
 func trace(vals ...interface{}) func(vals ...interface{}) {
 	return libtrace.Trace(1, "", vals...)
 }
+
+func tracef(form string, vals ...interface{}) {
+	libtrace.Tracef(1, form, vals...)
+}
