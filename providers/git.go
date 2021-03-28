@@ -17,12 +17,15 @@ import (
 	"encoding/hex"
 	"io"
 	"io/ioutil"
+	"net/url"
 	"os"
 	"path"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
+	"github.com/billziss-gh/golib/config"
 	"github.com/billziss-gh/hubfs/git"
 )
 
@@ -41,6 +44,7 @@ type gitRef struct {
 	commitHash string
 	tree       map[string]*gitTreeEntry
 	treeTime   time.Time
+	modules    map[string]string
 }
 
 type gitTreeEntry struct {
@@ -594,6 +598,78 @@ func (r *gitRepository) GetBlobReader(entry TreeEntry) (res io.ReaderAt, err err
 	want := []string{entry.Hash()}
 	err = r.fetchReaders(dir, want, func(hash string, reader io.ReaderAt) error {
 		res = reader
+		return nil
+	})
+	return
+}
+
+func (r *gitRepository) ensureModules(
+	ref0 Ref, fn func(modules map[string]string) error) error {
+	r.once.Do(func() { r.open() })
+	if nil == r.repo {
+		return ErrNotFound
+	}
+
+	ref, _ := ref0.(*gitRef)
+
+	r.lock.RLock()
+	if nil != ref.modules {
+		err := fn(ref.modules)
+		r.lock.RUnlock()
+		return err
+	}
+	r.lock.RUnlock()
+
+	entry, err := r.GetTreeEntry(ref, nil, ".gitmodules")
+	if nil != err {
+		return err
+	}
+
+	reader, err := r.GetBlobReader(entry)
+	if nil != err {
+		return err
+	}
+
+	c, err := config.Read(reader.(io.Reader))
+	reader.(io.Closer).Close()
+	if nil != err {
+		return err
+	}
+
+	modules := make(map[string]string)
+	for _, s := range c {
+		p := s["path"]
+		u := s["url"]
+		if "" != p && "" != u {
+			modules[p] = u
+		}
+	}
+
+	r.lock.Lock()
+	if nil == ref.modules {
+		ref.modules = modules
+	}
+	err = fn(ref.modules)
+	r.lock.Unlock()
+	return err
+}
+
+func (r *gitRepository) GetModule(ref Ref, path string, rootrel bool) (res string, err error) {
+	err = r.ensureModules(ref, func(modules map[string]string) error {
+		var ok bool
+		res, ok = modules[path]
+		if !ok {
+			return ErrNotFound
+		}
+		if rootrel {
+			u0, e0 := url.Parse(r.remote)
+			u1, e1 := url.Parse(res)
+			if nil == e0 && nil == e1 {
+				if u0.Scheme == u1.Scheme && u0.Host == u1.Host {
+					res = strings.TrimSuffix(u1.Path, ".git")
+				}
+			}
+		}
 		return nil
 	})
 	return

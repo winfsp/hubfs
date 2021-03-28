@@ -67,6 +67,10 @@ func (*emptyRepositoryT) GetBlobReader(entry TreeEntry) (io.ReaderAt, error) {
 	return nil, ErrNotFound
 }
 
+func (*emptyRepositoryT) GetModule(ref Ref, path string, rootrel bool) (string, error) {
+	return "", ErrNotFound
+}
+
 func init() {
 	emptyRepository = &emptyRepositoryT{}
 }

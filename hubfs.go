@@ -20,7 +20,6 @@ import (
 	"time"
 
 	"github.com/billziss-gh/cgofuse/fuse"
-	"github.com/billziss-gh/golib/config"
 	libtrace "github.com/billziss-gh/golib/trace"
 	"github.com/billziss-gh/hubfs/providers"
 )
@@ -123,54 +122,6 @@ func (fs *Hubfs) release(obs *obstack) {
 	}
 }
 
-func (fs *Hubfs) getmodule(obs *obstack, path string) (errc int, module string) {
-	path = strings.Join(split(pathutil.Join(fs.prefix, path))[3:], "/")
-
-	fs.lock.RLock()
-	if nil != fs.modules {
-		module = fs.modules[path]
-		fs.lock.RUnlock()
-		return
-	}
-	fs.lock.RUnlock()
-
-	entry, err := obs.repository.GetTreeEntry(obs.ref, nil, ".gitmodules")
-	if nil != err {
-		errc = -fuse.EIO
-		return
-	}
-
-	reader, err := obs.repository.GetBlobReader(entry)
-	if nil != err {
-		errc = -fuse.EIO
-		return
-	}
-
-	c, err := config.Read(reader.(io.Reader))
-	reader.(io.Closer).Close()
-	if nil != err {
-		errc = -fuse.EIO
-		return
-	}
-
-	modules := make(map[string]string)
-	for _, s := range c {
-		p := s["path"]
-		u := s["url"]
-		if "" != p && "" != u {
-			modules[p] = fs.client.ResolveSubmodule(u)
-		}
-	}
-
-	fs.lock.Lock()
-	if nil == fs.modules {
-		fs.modules = modules
-	}
-	module = fs.modules[path]
-	fs.lock.Unlock()
-	return
-}
-
 func (fs *Hubfs) getattr(obs *obstack, entry providers.TreeEntry, path string, stat *fuse.Stat_t) (
 	target string) {
 
@@ -183,11 +134,13 @@ func (fs *Hubfs) getattr(obs *obstack, entry providers.TreeEntry, path string, s
 			stat.Size = int64(len(target))
 		case 0160000 /* submodule */ :
 			target = entry.Target()
-			e, module := fs.getmodule(obs, path)
+			path = strings.Join(split(pathutil.Join(fs.prefix, path))[3:], "/")
+			module, err := obs.repository.GetModule(obs.ref, path, true)
 			if "" != module {
 				target = module + "/" + entry.Target()
 			} else {
-				tracef("getmodule(%#v) is empty (error %d)", path, e)
+				tracef("repo=%#v Getmodule(ref=%#v, %#v) = %v",
+					obs.repository.Name(), obs.ref.Name(), path, err)
 			}
 			stat.Size = int64(len(target))
 		}

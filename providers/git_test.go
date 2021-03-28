@@ -293,6 +293,43 @@ func TestGetBlobReader(t *testing.T) {
 	}
 }
 
+func TestGetModule(t *testing.T) {
+	const remote = "https://github.com/billziss-gh/winfsp"
+	const refName = "refs/heads/master"
+	const modulePath = "ext/test"
+	const moduleTarget = "/billziss-gh/secfs.test"
+
+	repository, err := NewGitRepository(remote, "")
+	if nil != err {
+		t.Error(err)
+	}
+	defer repository.Close()
+
+	ref, err := repository.GetRef(refName)
+	if nil != err {
+		t.Error(err)
+	}
+	if ref.Name() != refName {
+		t.Error()
+	}
+
+	module, err := repository.GetModule(ref, modulePath, true)
+	if nil != err {
+		t.Error(err)
+	}
+	if module != moduleTarget {
+		t.Error()
+	}
+
+	module, err = repository.GetModule(ref, modulePath, true)
+	if nil != err {
+		t.Error(err)
+	}
+	if module != moduleTarget {
+		t.Error()
+	}
+}
+
 func init() {
 	atinit(func() error {
 		token, err := keyring.Get("hubfs", "https://github.com")

@@ -35,7 +35,6 @@ type Client interface {
 	GetRepositories(owner Owner) ([]Repository, error)
 	OpenRepository(owner Owner, name string) (Repository, error)
 	CloseRepository(repository Repository)
-	ResolveSubmodule(target string) string
 	StartExpiration()
 	StopExpiration()
 }
@@ -55,6 +54,7 @@ type Repository interface {
 	GetTree(ref Ref, entry TreeEntry) ([]TreeEntry, error)
 	GetTreeEntry(ref Ref, entry TreeEntry, name string) (TreeEntry, error)
 	GetBlobReader(entry TreeEntry) (io.ReaderAt, error)
+	GetModule(ref Ref, path string, rootrel bool) (string, error)
 }
 
 type Ref interface {
