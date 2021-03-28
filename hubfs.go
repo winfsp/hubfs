@@ -88,7 +88,15 @@ func (fs *Hubfs) open(path string) (errc int, res *obstack) {
 	for i, c := range split(pathutil.Join(fs.prefix, path)) {
 		switch i {
 		case 0:
-			obs.owner, err = fs.client.OpenOwner(c)
+			// We disallow some names to speed up operations:
+			//
+			// - All names containing dots: e.g. ".git", ".DS_Store", "autorun.inf"
+			// - The special git name HEAD
+			if -1 != strings.IndexFunc(c, func(r rune) bool { return '.' == r }) || "HEAD" == c {
+				obs.owner, err = nil, providers.ErrNotFound
+			} else {
+				obs.owner, err = fs.client.OpenOwner(c)
+			}
 		case 1:
 			obs.repository, err = fs.client.OpenRepository(obs.owner, c)
 		case 2:
