@@ -227,10 +227,11 @@ func (fs *Hubfs) Getattr(path string, stat *fuse.Stat_t, fh uint64) (errc int) {
 	// submodules. However the logic does not currently handle cases where
 	// a symlink is at the middle of the path:
 	//
-	// path = /name/.../name/LINK/.                 --resolves-to->
-	// path = /name/.../name/LINK/name/.../name     --resolves-to-> ?
+	// path = /name/.../name/LINK1/.                --resolves-to->
+	// path = /name/.../name/LINK2/name/.../name    --resolves-to-> ?
 
 	resolve := strings.HasSuffix(path, "/.")
+	retries := 0
 
 retry:
 	errc, obs := fs.open(path)
@@ -242,12 +243,13 @@ retry:
 
 	fs.release(obs)
 
-	if resolve && "" != target {
+	if resolve && "" != target && 16 > retries {
 		if '/' == target[0] {
 			path = target
 		} else {
 			path = pathutil.Join(path, "..", target)
 		}
+		retries++
 		goto retry
 	}
 
