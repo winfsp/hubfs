@@ -400,6 +400,18 @@ func (client *githubClient) StartExpiration() {
 
 func (client *githubClient) StopExpiration() {
 	client.cache.stopExpiration()
+
+	client.lock.Lock()
+	if "" == client.dir || client.keepdir {
+		client.lock.Unlock()
+		return
+	}
+	tmpdir := client.dir + time.Now().Format(".20060102T150405.000Z")
+	err := os.Rename(client.dir, tmpdir)
+	client.lock.Unlock()
+	if nil == err {
+		os.RemoveAll(tmpdir)
+	}
 }
 
 func (o *githubOwner) Name() string {
