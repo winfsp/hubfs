@@ -80,6 +80,7 @@ type githubClient struct {
 	token      string
 	login      string
 	dir        string
+	keepdir    bool
 	ttl        time.Duration
 	lock       sync.Mutex
 	cache      *cache
@@ -95,6 +96,7 @@ type githubOwner struct {
 type githubRepository struct {
 	cacheItem
 	Repository
+	keepdir bool
 	FName   string `json:"name"`
 	FRemote string `json:"clone_url"`
 }
@@ -149,11 +151,15 @@ func (client *githubClient) SetConfig(config []string) ([]string, error) {
 						if u, e := url.Parse(client.apiURI); nil == e {
 							n := strings.TrimSuffix(filepath.Base(p), ".exe")
 							v = filepath.Join(d, n, u.Hostname())
+							client.dir = v
+							client.keepdir = false
 						}
 					}
 				}
+			} else {
+				client.dir = v
+				client.keepdir = true
 			}
-			client.dir = v
 		case configValue(s, "provider.ttl=", &v):
 			if ttl, e := time.ParseDuration(v); nil == e && 0 < ttl {
 				client.ttl = ttl
@@ -225,6 +231,7 @@ func (client *githubClient) getRepositoryPage(path string) ([]*githubRepository,
 	for _, elm := range content {
 		elm.Value = elm
 		elm.Repository = emptyRepository
+		elm.keepdir = client.keepdir
 	}
 
 	return content, nil
@@ -427,11 +434,13 @@ func (r *githubRepository) expire(c *cache, currentTime time.Time) bool {
 			return
 		}
 
-		err := r.RemoveDirectory()
-		if nil == err {
-			r.Close()
-			r.Repository = emptyRepository
+		if r.keepdir {
+			tracef("repo=%#v", r.FRemote)
+		} else {
+			err := r.RemoveDirectory()
+			tracef("repo=%#v [RemoveDirectory() = %v]", r.FRemote, err)
 		}
-		tracef("%s (error %v)", r.FRemote, err)
+		r.Close()
+		r.Repository = emptyRepository
 	})
 }
