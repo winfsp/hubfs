@@ -8,8 +8,8 @@ github.com/billziss-gh/cgofuse v1.5.0 h1:kH516I/s+Ab4diL/Y/ayFeUjjA8ey+JK12xDfBf
 github.com/billziss-gh/cgofuse v1.5.0/go.mod h1:LJjoaUojlVjgo5GQoEJTcJNqZJeRU0nCR84CyxKt2YM=
 github.com/billziss-gh/go-git/v5 v5.2.1-0.20210325075736-c1624bffeb12 h1:7GkvcxnD8fdlVMiZGW4BKbIIUQ0/l8Vch8rYog5C5F0=
 github.com/billziss-gh/go-git/v5 v5.2.1-0.20210325075736-c1624bffeb12/go.mod h1:kh02eMX+wdqqxgNMEyq8YgwlIOsDOa9homkUq1PoTMs=
-github.com/billziss-gh/golib v0.1.0 h1:OGNQmU5tvoVCU0beo0/zhAZ8LC+K77tKopp1433vnLE=
-github.com/billziss-gh/golib v0.1.0/go.mod h1:mZpUYANXZkDKSnyYbX9gfnyxwe0ddRhUtfXcsD5r8dw=
+github.com/billziss-gh/golib v0.2.0 h1:NyvcAQdfvM8xokKkKotiligKjKXzuQD4PPykg1nKc/8=
+github.com/billziss-gh/golib v0.2.0/go.mod h1:mZpUYANXZkDKSnyYbX9gfnyxwe0ddRhUtfXcsD5r8dw=
 github.com/cli/browser v1.0.0 h1:RIleZgXrhdiCVgFBSjtWwkLPUCWyhhhN5k5HGSBt1js=
 github.com/cli/browser v1.0.0/go.mod h1:IEWkHYbLjkhtjwwWlwTHW2lGxeS5gezEQBMLTwDHf5Q=
 github.com/cli/oauth v0.8.0 h1:YTFgPXSTvvDUFti3tR4o6q7Oll2SnQ9ztLwCAn4/IOA=

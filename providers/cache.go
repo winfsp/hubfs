@@ -13,11 +13,38 @@
 package providers
 
 import (
+	"strings"
 	"sync"
 	"time"
 
 	libcache "github.com/billziss-gh/golib/cache"
 )
+
+type cacheImap struct {
+	libcache.Map
+}
+
+func NewCacheImap(list *libcache.MapItem) *cacheImap {
+	m := &cacheImap{}
+	m.Map.InitMap(list)
+	return m
+}
+
+func (m *cacheImap) Items() map[string]*libcache.MapItem {
+	return m.Map.Items()
+}
+
+func (m *cacheImap) Get(key string) (*libcache.MapItem, bool) {
+	return m.Map.Get(strings.ToUpper(key))
+}
+
+func (m *cacheImap) Set(key string, newitem *libcache.MapItem, expirable bool) {
+	m.Map.Set(strings.ToUpper(key), newitem, expirable)
+}
+
+func (m *cacheImap) Delete(key string) {
+	m.Map.Delete(strings.ToUpper(key))
+}
 
 type cache struct {
 	Value   interface{}
@@ -47,6 +74,10 @@ func newCache(lock sync.Locker) *cache {
 
 func (c *cache) newCacheMap() *libcache.Map {
 	return libcache.NewMap(&c.lrulist)
+}
+
+func (c *cache) newCacheImap() *cacheImap {
+	return NewCacheImap(&c.lrulist)
 }
 
 func (c *cache) touchCacheItem(citem *cacheItem, delta int) {

@@ -25,7 +25,6 @@ import (
 	"time"
 
 	"github.com/billziss-gh/golib/appdata"
-	libcache "github.com/billziss-gh/golib/cache"
 	"github.com/billziss-gh/hubfs/httputil"
 	"github.com/cli/oauth"
 )
@@ -84,12 +83,12 @@ type githubClient struct {
 	ttl        time.Duration
 	lock       sync.Mutex
 	cache      *cache
-	owners     *libcache.Map
+	owners     *cacheImap
 }
 
 type githubOwner struct {
 	cacheItem
-	repositories *libcache.Map
+	repositories *cacheImap
 	FName        string `json:"login"`
 }
 
@@ -283,7 +282,7 @@ func (client *githubClient) OpenOwner(name string) (Owner, error) {
 
 	client.lock.Lock()
 	if nil == client.owners {
-		client.owners = client.cache.newCacheMap()
+		client.owners = client.cache.newCacheImap()
 	}
 	item, ok := client.owners.Get(name)
 	if ok {
@@ -318,7 +317,7 @@ func (client *githubClient) ensureRepositories(owner *githubOwner, fn func() err
 
 	client.lock.Lock()
 	if nil == owner.repositories {
-		owner.repositories = client.cache.newCacheMap()
+		owner.repositories = client.cache.newCacheImap()
 		for _, elm := range repositories {
 			owner.repositories.Set(elm.FName, &elm.MapItem, true)
 			client.cache.touchCacheItem(&elm.cacheItem, 0)
