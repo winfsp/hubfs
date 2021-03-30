@@ -176,7 +176,7 @@ func init() {
 			return err
 		}
 
-		client.SetConfig([]string{"provider.ttl=1s"})
+		client.SetConfig([]string{"config.ttl=1s"})
 
 		return nil
 	})

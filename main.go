@@ -178,7 +178,7 @@ func run() (ec int) {
 			}
 		}
 
-		_, err = client.SetConfig([]string{"provider.dir=:"})
+		_, err = client.SetConfig([]string{"config.dir=:"})
 		if nil != err {
 			warn("config error: %v", err)
 			return 1

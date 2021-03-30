@@ -144,7 +144,7 @@ func (client *githubClient) SetConfig(config []string) ([]string, error) {
 	for _, s := range config {
 		v := ""
 		switch {
-		case configValue(s, "provider.dir=", &v):
+		case configValue(s, "config.dir=", &v):
 			if ":" == v {
 				if d, e := appdata.CacheDir(); nil == e {
 					if p, e := os.Executable(); nil == e {
@@ -160,7 +160,7 @@ func (client *githubClient) SetConfig(config []string) ([]string, error) {
 				client.dir = v
 				client.keepdir = true
 			}
-		case configValue(s, "provider.ttl=", &v):
+		case configValue(s, "config.ttl=", &v):
 			if ttl, e := time.ParseDuration(v); nil == e && 0 < ttl {
 				client.ttl = ttl
 			}
