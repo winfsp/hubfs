@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<?define UpgradeCode64="8EB70D4C-56EE-488F-9574-3547894A9C2F"?>
+<?define UpgradeCode32="C394327C-2DE3-4863-9125-22124929CABF"?>
+<?if $(var.MyArch) = x64?>
+    <?define UpgradeCode="$(var.UpgradeCode64)"?>
+    <?define OtherUpgradeCode="$(var.UpgradeCode32)"?>
+    <?define ProgramFilesFolder="ProgramFiles64Folder"?>
+    <?define LauncherRegistryKey="Software\WOW6432Node\WinFsp\Services"?>
+<?else?>
+    <?define UpgradeCode="$(var.UpgradeCode32)"?>
+    <?define OtherUpgradeCode="$(var.UpgradeCode64)"?>
+    <?define ProgramFilesFolder="ProgramFilesFolder"?>
+    <?define LauncherRegistryKey="Software\WinFsp\Services"?>
+<?endif?>
+
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+    <Product
+        Id="*"
+        Name="$(var.MyProductName) $(var.MyProductVersion)"
+        Manufacturer="$(var.MyCompanyName)"
+        Version="$(var.MyVersion)"
+        Language="1033"
+        UpgradeCode="$(var.UpgradeCode)">
+
+        <Package
+            Description="$(var.MyProductName) $(var.MyProductVersion) - $(var.MyDescription)"
+            InstallerVersion="200"
+            Compressed="yes"
+            InstallScope="perMachine" />
+        <MajorUpgrade
+            Disallow="yes"
+            AllowDowngrades="no"
+            AllowSameVersionUpgrades="no"
+            DisallowUpgradeErrorMessage="An older version of $(var.MyProductName) is already installed. You must uninstall it before you can install this version."
+            DowngradeErrorMessage="A newer version of $(var.MyProductName) is already installed." />
+        <Media Id="1" Cabinet="hubfs_win.cab" EmbedCab="yes" />
+
+        <Property Id="OTHERINSTALLED">
+            <ProductSearch UpgradeCode="$(var.OtherUpgradeCode)" Minimum="0.0.0.0" />
+        </Property>
+        <Condition Message="A version of $(var.MyProductName) with a different computer architecture is already installed. You must uninstall it before you can install this version.">
+            NOT OTHERINSTALLED
+        </Condition>
+
+        <Property Id="P.LauncherRegistryKey">$(var.LauncherRegistryKey)</Property>
+        <Property Id="P.RegistryKey">Software\$(var.MyProductName)</Property>
+        <Property Id="INSTALLDIR">
+            <RegistrySearch
+                Id="R.INSTALLDIR"
+                Root="HKLM"
+                Key="[P.RegistryKey]"
+                Name="InstallDir"
+                Type="raw" />
+        </Property>
+
+        <Directory Id="TARGETDIR" Name="SourceDir">
+            <Directory Id="$(var.ProgramFilesFolder)">
+                <Directory Id="INSTALLDIR" Name="$(var.MyProductName)" />
+            </Directory>
+        </Directory>
+
+        <DirectoryRef Id="INSTALLDIR">
+            <Component Id="C.INSTALLDIR" Guid="{B9782B67-BCCF-47BB-82C2-B4C1F222113F}">
+                <RegistryValue
+                    Root="HKLM"
+                    Key="[P.RegistryKey]"
+                    Name="InstallDir"
+                    Type="string"
+                    Value="[INSTALLDIR]"
+                    KeyPath="yes" />
+            </Component>
+            <Component Id="C.License.txt">
+                <File Name="License.txt" Source="License.txt" KeyPath="yes" />
+            </Component>
+            <Component Id="C.hubfs.exe">
+                <File Name="hubfs.exe" Source="hubfs.exe" KeyPath="yes" />
+            </Component>
+            <Component Id="C.hubfs.reg" Guid="{3DA8A8D0-1BAD-4A28-B742-245616194230}">
+                <RegistryKey
+                    Root="HKLM"
+                    Key="[P.LauncherRegistryKey]">
+                    <RegistryKey
+                        Key="hubfs">
+                        <RegistryValue
+                            Type="string"
+                            Name="Executable"
+                            Value="[INSTALLDIR]hubfs.exe"
+                            KeyPath="yes" />
+                        <RegistryValue
+                            Type="string"
+                            Name="CommandLine"
+                            Value="-auth optional -o VolumePrefix=%\/_1 -o UserName=%\\_U -o FileTimeout=1000,rellinks %\/b/_1 %2" />
+                        <RegistryValue
+                            Type="string"
+                            Name="Security"
+                            Value="D:P(A;;RPWPLC;;;WD)" />
+                        <RegistryValue
+                            Type="integer"
+                            Name="JobControl"
+                            Value="1" />
+                    </RegistryKey>
+                </RegistryKey>
+            </Component>
+        </DirectoryRef>
+
+        <Feature
+            Id="F.Main"
+            Level="1"
+            Title="$(var.MyProductName) $(var.MyProductVersion)"
+            Description="$(var.MyDescription)"
+            Display="expand"
+            ConfigurableDirectory="INSTALLDIR"
+            AllowAdvertise="no"
+            InstallDefault="local"
+            Absent="disallow">
+            <ComponentRef Id="C.INSTALLDIR" />
+            <ComponentRef Id="C.License.txt" />
+            <ComponentRef Id="C.hubfs.exe" />
+            <ComponentRef Id="C.hubfs.reg" />
+        </Feature>
+
+        <UI Id="FeatureTree">
+            <UIRef Id="WixUI_FeatureTree" />
+            <!-- skip the license agreement dialog; higher Order takes priority (weird) -->
+            <Publish
+                Dialog="WelcomeDlg"
+                Control="Next"
+                Event="NewDialog"
+                Value="CustomizeDlg"
+                Order="10">NOT Installed</Publish>
+            <Publish
+                Dialog="CustomizeDlg"
+                Control="Back"
+                Event="NewDialog"
+                Value="WelcomeDlg"
+                Order="10">NOT Installed</Publish>
+        </UI>
+
+    </Product>
+</Wix>
