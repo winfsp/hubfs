@@ -53,7 +53,7 @@ msi: build
 		-ext WixUIExtension \
 		hubfs.wixobj
 	signtool sign \
-		/ac tools/$(CrossCert) \
+		/ac $(CrossCert) \
 		/i $(CertIssuer) \
 		/n $(MyCompanyName) \
 		/d $(MyDescription) \
