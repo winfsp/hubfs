@@ -92,8 +92,13 @@ func run() (ec int) {
 	}
 
 	flag.BoolVar(&printver, "version", printver, "print version information")
-	flag.StringVar(&authmeth, "auth", authmeth, "auth method {full, required, optional, none}")
-	flag.StringVar(&authkey, "authkey", authkey, "`name` of key that stores auth token")
+	flag.StringVar(&authmeth, "auth", "",
+		"`method` is from list below; auth tokens stored in system keyring\n"+
+			"- full      perform interactive auth, if token not present (default)\n"+
+			"- required  auth token required to be present\n"+
+			"- optional  auth token will be used if present\n"+
+			"- none      do not use auth token even if present")
+	flag.StringVar(&authkey, "authkey", authkey, "`name` of key that stores auth token in system keyring")
 	flag.BoolVar(&authonly, "authonly", authonly, "perform auth only; do not mount")
 	flag.Var(&mntopt, "o", "FUSE mount `options`")
 
