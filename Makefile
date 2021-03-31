@@ -39,7 +39,7 @@ racy:
 
 .PHONY: msi
 msi: build
-	$(WIX)\bin\candle -nologo -arch x64 -pedantic \
+	candle -nologo -arch x64 -pedantic \
 		-dMyVersion=$(MyVersion) \
 		-dMyProductVersion=$(MyProductVersion) \
 		-dMyProductName=$(MyProductName) \
@@ -48,7 +48,16 @@ msi: build
 		-dMyArch=x64 \
 		-o hubfs.wixobj \
 		hubfs.wxs
-	$(WIX)\bin\light -nologo \
+	light -nologo \
 		-o hubfs-win-$(MyVersion).msi \
 		-ext WixUIExtension \
 		hubfs.wixobj
+	signtool sign \
+		/ac tools/$(CrossCert) \
+		/i $(CertIssuer) \
+		/n $(MyCompanyName) \
+		/d $(MyDescription) \
+		/fd sha1 \
+		/t http://timestamp.digicert.com \
+		hubfs-win-$(MyVersion).msi || \
+		echo "SIGNING FAILED! The product has been successfully built, but not signed." 1>&2
