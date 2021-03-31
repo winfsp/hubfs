@@ -26,11 +26,11 @@ import (
 )
 
 var (
-	MyProductName = "hubfs"
-	MyDescription = "File system for GitHub"
-	MyCopyright   = "2021 Bill Zissimopoulos"
-	MyRepository  = "https://github.com/billziss-gh/hubfs"
-	MyVersion     = "DEVEL"
+	MyVersion        = "DEVVER"
+	MyProductVersion = "PRDVER"
+	MyProductName    = "hubfs"
+	MyDescription    = "File system for GitHub"
+	MyCopyright      = "2021 Bill Zissimopoulos"
 )
 
 func warn(format string, a ...interface{}) {
@@ -77,6 +77,7 @@ func authNewClientWithKey(provider providers.Provider, authkey string) (
 }
 
 func run() (ec int) {
+	printver := false
 	authmeth := "full"
 	authkey := ""
 	authonly := false
@@ -90,12 +91,21 @@ func run() (ec int) {
 		flag.PrintDefaults()
 	}
 
+	flag.BoolVar(&printver, "version", printver, "print version information")
 	flag.StringVar(&authmeth, "auth", authmeth, "auth method {full, required, optional, none}")
 	flag.StringVar(&authkey, "authkey", authkey, "`name` of key that stores auth token")
 	flag.BoolVar(&authonly, "authonly", authonly, "perform auth only; do not mount")
 	flag.Var(&mntopt, "o", "FUSE mount `options`")
 
 	flag.Parse()
+
+	if printver {
+		fmt.Printf("%s - %s %s (%s)\nCopyright %s\n",
+			MyProductName, MyDescription, MyProductVersion, MyVersion,
+			MyCopyright)
+		return 0
+	}
+
 	switch flag.NArg() {
 	case 1:
 		mntpnt = flag.Arg(0)
