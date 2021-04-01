@@ -43,6 +43,7 @@
             NOT OTHERINSTALLED
         </Condition>
 
+        <!-- For explanation see https://stackoverflow.com/a/3824949 -->
         <Property Id="DISABLEADVTSHORTCUTS" Value="1" />
 
         <Property Id="P.LauncherRegistryKey">$(var.LauncherRegistryKey)</Property>
