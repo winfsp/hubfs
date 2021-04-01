@@ -43,6 +43,8 @@
             NOT OTHERINSTALLED
         </Condition>
 
+        <Property Id="DISABLEADVTSHORTCUTS" Value="1" />
+
         <Property Id="P.LauncherRegistryKey">$(var.LauncherRegistryKey)</Property>
         <Property Id="P.RegistryKey">Software\$(var.MyProductName)</Property>
         <Property Id="INSTALLDIR">
@@ -57,6 +59,9 @@
         <Directory Id="TARGETDIR" Name="SourceDir">
             <Directory Id="$(var.ProgramFilesFolder)">
                 <Directory Id="INSTALLDIR" Name="$(var.MyProductName)" />
+            </Directory>
+            <Directory Id="ProgramMenuFolder">
+                <Directory Id="ProductMenu" Name="$(var.MyProductName)"/>
             </Directory>
         </Directory>
 
@@ -75,6 +80,14 @@
             </Component>
             <Component Id="C.hubfs.exe">
                 <File Name="hubfs.exe" Source="hubfs.exe" KeyPath="yes" />
+                <Shortcut
+                    Id="S.GitHub.lnk"
+                    Directory="ProductMenu"
+                    Name="Perform GitHub Auth"
+                    Arguments="-auth=force -authkey=https://github.com -authonly"
+                    WorkingDirectory="INSTALLDIR"
+                    Advertise="yes" />
+                <RemoveFolder Id="ProductMenu" Directory="ProductMenu" On="uninstall" />
             </Component>
             <Component Id="C.hubfs.reg" Guid="{3DA8A8D0-1BAD-4A28-B742-245616194230}">
                 <RegistryKey

@@ -93,8 +93,9 @@ func run() (ec int) {
 
 	flag.BoolVar(&printver, "version", printver, "print version information")
 	flag.StringVar(&authmeth, "auth", "",
-		"`method` is from list below; auth tokens stored in system keyring\n"+
-			"- full      perform interactive auth, if token not present (default)\n"+
+		"`method` is from list below; auth tokens are stored in system keyring\n"+
+			"- force     perform interactive auth even if token present\n"+
+			"- full      perform interactive auth if token not present (default)\n"+
 			"- required  auth token required to be present\n"+
 			"- optional  auth token will be used if present\n"+
 			"- none      do not use auth token even if present")
@@ -124,7 +125,7 @@ func run() (ec int) {
 		}
 	}
 	switch authmeth {
-	case "full", "required", "optional":
+	case "force", "full", "required", "optional":
 	case "none":
 		if authonly {
 			flag.Usage()
@@ -157,6 +158,8 @@ func run() (ec int) {
 
 	var client providers.Client
 	switch authmeth {
+	case "force":
+		client, err = authNewClientWithKey(provider, authkey)
 	case "full":
 		client, err = newClientWithKey(provider, authkey)
 		if nil != err {
