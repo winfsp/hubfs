@@ -49,9 +49,11 @@ msi: build
 		-o hubfs.wixobj \
 		hubfs.wxs
 	light -nologo \
-		-o hubfs-win-$(MyVersion).msi \
 		-ext WixUIExtension \
+		-spdb \
+		-o hubfs-win-$(MyVersion).msi \
 		hubfs.wixobj
+	del hubfs.wixobj
 	signtool sign \
 		/ac $(CrossCert) \
 		/i $(CertIssuer) \
