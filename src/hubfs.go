@@ -144,6 +144,7 @@ func (fs *Hubfs) getattr(obs *obstack, entry providers.TreeEntry, path string, s
 			target = entry.Target()
 			path = strings.Join(split(pathutil.Join(fs.prefix, path))[3:], "/")
 			module, err := obs.repository.GetModule(obs.ref, path, true)
+			module = strings.TrimPrefix(module, strings.TrimSuffix(fs.prefix, "/"))
 			if "" != module {
 				target = module + "/" + entry.Target()
 			} else {
@@ -434,7 +435,7 @@ func Mount(client providers.Client, prefix string, mntpnt string, config []strin
 
 	fs := &Hubfs{
 		client:  client,
-		prefix:  prefix,
+		prefix:  pathutil.Clean(prefix),
 		openmap: make(map[uint64]*obstack),
 	}
 	fs.client.StartExpiration()
