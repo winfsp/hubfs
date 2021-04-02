@@ -41,6 +41,8 @@ racy:
 
 .PHONY: msi
 msi: build
+	powershell -NoProfile -NonInteractive -ExecutionPolicy Unrestricted \
+		"Compress-Archive -Path hubfs.exe -DestinationPath .\hubfs-win-$(MyVersion).zip"
 	candle -nologo -arch x64 -pedantic \
 		-dMyVersion=$(MyVersion) \
 		-dMyProductVersion=$(MyProductVersion) \
