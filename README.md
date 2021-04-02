@@ -25,7 +25,7 @@ HUBFS supports both authenticated and non-authenticated access to repositories. 
 
 In order to mount HUBFS issue the command `hubfs MOUNTPOINT`. For example, `hubfs H:` on Windows or `hubfs mnt` on macOS and Linux.
 
-The first time you run HUBFS you will be prompted to authorize with GitHub:
+The first time you run HUBFS you will be prompted to authorize it with GitHub:
 
 ```
 > ./hubfs H:
@@ -39,9 +39,9 @@ To unmount the file system simply use <kbd>Ctrl-C</kbd>. On macOS and Linux you 
 
 ### File system representation
 
-By default HUBFS presents the following file system hierarchy: `/` *owner* `/` *repository* `/` *ref* `/` *path*
+By default HUBFS presents the following file system hierarchy: / *owner* / *repository* / *ref* / *path*
 
-- *Owner* represents the owner of repositories under GitHub. It may be a user or organization. An *owner* is presented as a subdirectory of the root directory that contains *repositories*. However the root directory cannot be listed, because there are far too many owners to list.
+- *Owner* represents the owner of repositories under GitHub. It may be a user or organization. An *owner* is presented as a subdirectory of the root directory and contains *repositories*. However the root directory cannot be listed, because there are far too many owners to list.
 
 - *Repository* represents a repository owned by an *owner*. A *repository* is presented as a directory that contains *refs*.
 
