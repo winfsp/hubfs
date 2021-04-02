@@ -435,7 +435,7 @@ func Mount(client providers.Client, prefix string, mntpnt string, config []strin
 
 	fs := &Hubfs{
 		client:  client,
-		prefix:  pathutil.Clean(prefix),
+		prefix:  prefix,
 		openmap: make(map[uint64]*obstack),
 	}
 	fs.client.StartExpiration()
