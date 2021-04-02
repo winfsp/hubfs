@@ -13,7 +13,8 @@ for /f "tokens=*" %%i in ('reg query %RegKey% /f * /k ^| findstr "\10."') do (
 )
 
 set PATH=%KitsRoot%bin\%KitsInst%\x64;%WIX%\bin;%PATH%
-set CPATH=C:\Program Files (x86)\WinFsp\inc\fuse
+rem set CPATH=C:\Program Files (x86)\WinFsp\inc\fuse
+set CGO_ENABLED=0
 
 for /f %%d in ('powershell -NoProfile -NonInteractive -ExecutionPolicy Unrestricted "$d=[System.DateTime]::Now; $d.ToString('yy')+$d.DayOfYear.ToString('000')"') do (
     set MyBuildNumber=%%d
