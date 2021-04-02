@@ -125,6 +125,8 @@ func run() (ec int) {
 		}
 	}
 	switch authmeth {
+	case "":
+		authmeth = "full"
 	case "force", "full", "required", "optional":
 	case "none":
 		if authonly {
