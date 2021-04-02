@@ -23,6 +23,7 @@ default: build
 
 .PHONY: build
 build:
+	cd src && \
 	go build \
 		-ldflags "-s -w \
 			-X \"main.MyVersion=$(subst $\",,$(MyVersion))\" \
@@ -31,11 +32,12 @@ build:
 			-X \"main.MyDescription=$(subst $\",,$(MyDescription))\" \
 			-X \"main.MyCopyright=$(subst $\",,$(MyCopyright))\" \
 			" \
-		-o hubfs$(ExeSuffix)
+		-o ../hubfs$(ExeSuffix)
 
 .PHONY: racy
 racy:
-	go build -race -o hubfs$(ExeSuffix)
+	cd src && \
+	go build -race -o ../hubfs$(ExeSuffix)
 
 .PHONY: msi
 msi: build
