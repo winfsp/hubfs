@@ -1,5 +1,5 @@
 <h1 align="center">
-<img src="art/hubfs.png" width="256"/>
+<img src="art/hubfs-glow.png" width="256"/>
 <br/>
 <br/>
 HUBFS &middot; File System for GitHub
