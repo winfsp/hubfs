@@ -1,10 +1,16 @@
-# HUBFS - File System for GitHub
+<h1 align="center">
+<img src="art/hubfs.png" width="256"/>
+<br/>
+<br/>
+HUBFS &middot; File System for GitHub
+</h1>
 
+<p align="center">
 HUBFS is a read-only file system for GitHub and Git. Git repositories and their contents are represented as regular directories and files and are accessible by any application, without the application having any knowledge that it is really accessing a remote Git repository.
-
+<br/>
+<br/>
 <img src="doc/cap1.gif" width="75%"/>
-
-The above screen capture shows HUBFS on Windows accessed from Powershell and VSCode.
+</p>
 
 ## Installation
 
