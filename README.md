@@ -6,22 +6,15 @@ HUBFS &middot; File System for GitHub
 </h1>
 
 <p align="center">
+<a href="https://github.com/billziss-gh/hubfs/releases/latest">
+<img src="https://img.shields.io/github/release/billziss-gh/hubfs.svg?label=Download&style=for-the-badge"/>
+</a>
+
 HUBFS is a read-only file system for GitHub and Git. Git repositories and their contents are represented as regular directories and files and are accessible by any application, without the application having any knowledge that it is really accessing a remote Git repository.
 <br/>
 <br/>
 <img src="doc/cap1.gif" width="75%"/>
 </p>
-
-## Installation
-
-**Windows**
-
-- Install the latest version of [WinFsp](https://github.com/billziss-gh/winfsp/releases).
-- Install the latest version of [HUBFS](https://github.com/billziss-gh/hubfs/releases). The Windows installer (MSI) includes better integration with Windows and is the recommended installation method. There is also a standalone Windows executable (ZIP) if you prefer.
-
-**macOS**
-
-**Linux**
 
 ## How to use
 
