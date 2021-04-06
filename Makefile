@@ -39,8 +39,8 @@ racy:
 	cd src && \
 	go build -race -o ../hubfs$(ExeSuffix)
 
-.PHONY: msi
-msi: build
+.PHONY: win
+win: build
 	powershell -NoProfile -NonInteractive -ExecutionPolicy Unrestricted \
 		"Compress-Archive -Path hubfs.exe -DestinationPath .\hubfs-win-$(MyVersion).zip"
 	candle -nologo -arch x64 -pedantic \
