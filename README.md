@@ -6,8 +6,8 @@ HUBFS &middot; File System for GitHub
 </h1>
 
 <p align="center">
-<a href="https://github.com/billziss-gh/hubfs/releases/latest">
-<img src="https://img.shields.io/github/release/billziss-gh/hubfs.svg?label=Download&style=for-the-badge"/>
+<a href="https://github.com/billziss-gh/hubfs/releases">
+<img src="https://img.shields.io/github/release/billziss-gh/hubfs/all.svg?label=Download&colorB=e52e4b&style=for-the-badge"/>
 </a>
 
 HUBFS is a read-only file system for GitHub and Git. Git repositories and their contents are represented as regular directories and files and are accessible by any application, without the application having any knowledge that it is really accessing a remote Git repository.
