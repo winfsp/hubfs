@@ -1,0 +1,3 @@
+[submodule "ext/glibc-compat"]
+	path = ext/glibc-compat
+	url = https://github.com/billziss-gh/glibc-compat

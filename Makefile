@@ -1,8 +1,8 @@
 # Makefile
 
 MyBuildNumber = $(shell date +%y%j)
-MyVersion = 0.1.$(MyBuildNumber)
-MyProductVersion = "2021 Beta1"
+MyVersion = 0.2.$(MyBuildNumber)
+MyProductVersion = "2021 Beta2"
 
 MyProductName = "HUBFS"
 MyDescription = "File system for GitHub"
@@ -12,10 +12,16 @@ MyCompanyName = "Navimatics LLC"
 CertIssuer = "DigiCert"
 CrossCert = "DigiCert High Assurance EV Root CA.crt"
 
-ifeq ($(OS),Windows_NT)
-ExeSuffix=.exe
-else
+ifneq ($(OS),Windows_NT)
+	OS=$(shell uname)
+endif
+
 ExeSuffix=
+ifeq ($(OS),Windows_NT)
+	ExeSuffix=.exe
+endif
+ifeq ($(OS),Linux)
+	export CGO_CFLAGS=-include $(dir $(realpath $(lastword $(MAKEFILE_LIST))))ext/glibc-compat/glibc-2.17.h
 endif
 
 .PHONY: default
@@ -67,3 +73,6 @@ win: build
 		/t http://timestamp.digicert.com \
 		hubfs-win-$(MyVersion).msi || \
 		echo "SIGNING FAILED! The product has been successfully built, but not signed." 1>&2
+
+.PHONY: lnx
+lnx: build
