@@ -3,6 +3,7 @@
 MyBuildNumber = $(shell date +%y%j)
 MyVersion = 0.2.$(MyBuildNumber)
 MyProductVersion = "2021 Beta2"
+MyProductStage = "Beta"
 
 MyProductName = "HUBFS"
 MyDescription = "File system for GitHub"
@@ -52,6 +53,7 @@ win: build
 	candle -nologo -arch x64 -pedantic \
 		-dMyVersion=$(MyVersion) \
 		-dMyProductVersion=$(MyProductVersion) \
+		-dMyProductStage=$(MyProductStage) \
 		-dMyProductName=$(MyProductName) \
 		-dMyDescription=$(MyDescription) \
 		-dMyCompanyName=$(MyCompanyName) \
