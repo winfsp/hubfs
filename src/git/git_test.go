@@ -6,8 +6,9 @@
 /*
  * This file is part of Hubfs.
  *
- * It is licensed under the MIT license. The full license text can be found
- * in the License.txt file at the root of this project.
+ * You can redistribute it and/or modify it under the terms of the GNU
+ * Affero General Public License version 3 as published by the Free
+ * Software Foundation.
  */
 
 package git

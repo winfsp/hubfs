@@ -110,4 +110,4 @@ HUBFS fetches objects with a depth of 1 and a filter of `tree:0`. This ensures t
 
 ## License
 
-This project is licensed under the [MIT License](License.txt).
+This project is licensed under the [GNU Affero General Public License version 3](License.txt).
