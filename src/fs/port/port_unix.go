@@ -27,9 +27,12 @@ func Chdir(path string) (errc int) {
 
 func Statfs(path string, stat *fuse.Statfs_t) (errc int) {
 	gost := syscall.Statfs_t{}
-	errc = Errno(syscall.Statfs(path, &gost))
+	e := syscall.Statfs(path, &gost)
+	if nil != e {
+		return Errno(e)
+	}
 	copyFusestatfsFromGostatfs(stat, &gost)
-	return
+	return 0
 }
 
 func Mknod(path string, mode uint32, dev int) (errc int) {
@@ -94,16 +97,22 @@ func Open(path string, flags int, mode uint32) (errc int, fh uint64) {
 
 func Lstat(path string, stat *fuse.Stat_t) (errc int) {
 	gost := syscall.Stat_t{}
-	errc = Errno(syscall.Lstat(path, &gost))
+	e := syscall.Lstat(path, &gost)
+	if nil != e {
+		return Errno(e)
+	}
 	copyFusestatFromGostat(stat, &gost)
-	return
+	return 0
 }
 
 func Fstat(fh uint64, stat *fuse.Stat_t) (errc int) {
 	gost := syscall.Stat_t{}
-	errc = Errno(syscall.Fstat(int(fh), &gost))
+	e := syscall.Fstat(int(fh), &gost)
+	if nil != e {
+		return Errno(e)
+	}
 	copyFusestatFromGostat(stat, &gost)
-	return
+	return 0
 }
 
 func Truncate(path string, length int64) (errc int) {
@@ -119,7 +128,6 @@ func Pread(fh uint64, p []byte, offset int64) (n int) {
 	if nil != e {
 		return Errno(e)
 	}
-
 	return n
 }
 
@@ -128,7 +136,6 @@ func Pwrite(fh uint64, p []byte, offset int64) (n int) {
 	if nil != e {
 		return Errno(e)
 	}
-
 	return n
 }
 
@@ -145,7 +152,6 @@ func Opendir(path string) (errc int, fh uint64) {
 	if nil != e {
 		return Errno(e), ^uint64(0)
 	}
-
 	return 0, uint64(fd)
 }
 
