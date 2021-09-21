@@ -379,10 +379,16 @@ func Open(path string, flags int, mode uint32) (errc int, fh uint64) {
 	switch flags & (fuse.O_CREAT) {
 	case fuse.O_CREAT:
 		CreateDisposition = syscall.CREATE_NEW
-		FileAttributes = mapModeToFileAttributes(mode &^ 0111)
+		FileAttributes = mapModeToFileAttributes(mode)
 	}
 
-	return open(path, DesiredAccess, CreateDisposition, FileAttributes)
+	errc, fh = open(path, DesiredAccess, CreateDisposition, FileAttributes)
+	if 0 == errc && 0 != 0x2000&FileAttributes /*FILE_ATTRIBUTE_NOT_CONTENT_INDEXED*/ {
+		/* FILE_ATTRIBUTE_NOT_CONTENT_INDEXED cannot be set by CreateFile; hence this malarkey */
+		Fchmod(fh, mode)
+	}
+
+	return
 }
 
 func Lstat(path string, stat *fuse.Stat_t) (errc int) {
@@ -740,8 +746,8 @@ func mapFileAttributesToMode(attr uint32) (mode uint32) {
 		if 0 == attr&syscall.FILE_ATTRIBUTE_READONLY {
 			mode |= 0222
 		}
-		if 0 != attr&0x2000 /*FILE_ATTRIBUTE_NOT_CONTENT_INDEXED*/ {
-			/* abuse FILE_ATTRIBUTE_NOT_CONTENT_INDEXED to store the executable bit */
+		if 0 == attr&0x2000 /*FILE_ATTRIBUTE_NOT_CONTENT_INDEXED*/ {
+			/* abuse FILE_ATTRIBUTE_NOT_CONTENT_INDEXED to store the NOT executable condition */
 			mode |= 0111
 		}
 	}
@@ -753,8 +759,8 @@ func mapModeToFileAttributes(mode uint32) (attr uint32) {
 	if 0 == mode&0200 {
 		attr |= syscall.FILE_ATTRIBUTE_READONLY
 	}
-	if 0 != mode&0100 {
-		/* abuse FILE_ATTRIBUTE_NOT_CONTENT_INDEXED to store the executable bit */
+	if 0 == mode&0100 {
+		/* abuse FILE_ATTRIBUTE_NOT_CONTENT_INDEXED to store the NOT executable condition */
 		attr |= 0x2000 /*FILE_ATTRIBUTE_NOT_CONTENT_INDEXED*/
 	}
 	if 0 == attr {
