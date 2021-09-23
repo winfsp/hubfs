@@ -144,7 +144,7 @@ func (fs *Unionfs) lsdir(path string,
 				func(name string, stat *fuse.Stat_t, ofst int64) bool {
 					cont = true
 					if "." != name && ".." != name {
-						if _, ok := minus[union.ComputePathkey(path+name, caseins)]; !ok {
+						if _, ok := minus[union.ComputePathkey(pathutil.Join(path, name), caseins)]; !ok {
 							cont = fill(name, uint8(v), stat)
 						}
 					}
@@ -618,7 +618,7 @@ func (fs *Unionfs) getwfile(path string, wrapfh uint64) (v uint8, fh uint64) {
 	fh = ^uint64(0)
 
 	fs.filemux.Lock()
-	f := fs.filemap.GetFile(path, wrapfh, false).(*file)
+	f := fs.filemap.GetFile(path, wrapfh, true).(*file)
 	fs.filemux.Unlock()
 	if nil != f {
 		v, fh = f.v, f.fh
@@ -759,7 +759,7 @@ func (fs *Unionfs) Create(path string, flags int, mode uint32) (errc int, fh uin
 	errc = fs.mknode(path, false, func(v uint8) int {
 		errc, fh = fs.fslist[v].Create(path, flags, mode)
 		if 0 == errc {
-			fh = fs.newfile(path, false, 0, fh, flags)
+			fh = fs.newfile(path, false, 0, fh, flags&(fuse.O_RDONLY|fuse.O_WRONLY|fuse.O_RDWR))
 		}
 		return errc
 	})
@@ -837,6 +837,8 @@ func (fs *Unionfs) Flush(path string, fh uint64) (errc int) {
 }
 
 func (fs *Unionfs) Release(path string, fh uint64) (errc int) {
+	wrapfh := fh
+
 	_, v, fh := fs.getfile("", fh)
 	if union.UNKNOWN == v {
 		return -fuse.EIO
@@ -846,7 +848,7 @@ func (fs *Unionfs) Release(path string, fh uint64) (errc int) {
 		errc = fs.fslist[v].Release(path, fh)
 	}
 
-	fs.delfile(path, fh)
+	fs.delfile(path, wrapfh)
 
 	return
 }
@@ -901,7 +903,9 @@ func (fs *Unionfs) Readdir(path string,
 	unmap := make(map[string]fuse.Stat_t)
 	ufill := func(name string, stat *fuse.Stat_t, ofst int64) bool {
 		if _, ok := unmap[name]; !ok {
-			if _, ok := minus[union.ComputePathkey(path+name, fs.pathmap.Caseins)]; !ok {
+			if "." == name || ".." == name {
+				unmap[name] = *stat
+			} else if _, ok := minus[union.ComputePathkey(pathutil.Join(path, name), fs.pathmap.Caseins)]; !ok {
 				unmap[name] = *stat
 			}
 		}
@@ -936,6 +940,8 @@ func (fs *Unionfs) Readdir(path string,
 }
 
 func (fs *Unionfs) Releasedir(path string, fh uint64) (errc int) {
+	wrapfh := fh
+
 	_, v, fh := fs.getfile("", fh)
 	if union.UNKNOWN == v {
 		return -fuse.EIO
@@ -945,7 +951,7 @@ func (fs *Unionfs) Releasedir(path string, fh uint64) (errc int) {
 		errc = fs.fslist[v].Releasedir(path, fh)
 	}
 
-	fs.delfile(path, fh)
+	fs.delfile(path, wrapfh)
 
 	return
 }
