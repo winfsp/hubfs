@@ -25,6 +25,7 @@ type Filer interface {
 
 type Filemap struct {
 	Filer
+	Caseins bool
 
 	openmap map[uint64]*fileitem
 	pathmap map[Pathkey]*fileitem
@@ -36,9 +37,10 @@ type fileitem struct {
 	file       interface{}
 }
 
-func NewFilemap(filer Filer) (fm *Filemap) {
+func NewFilemap(filer Filer, caseins bool) (fm *Filemap) {
 	fm = &Filemap{
 		Filer:   filer,
+		Caseins: caseins,
 		openmap: make(map[uint64]*fileitem),
 		pathmap: make(map[Pathkey]*fileitem),
 	}
@@ -61,7 +63,7 @@ func (fm *Filemap) NewFile(path string, file interface{}, track bool) (fh uint64
 	fm.openmap[fh] = f
 
 	if track {
-		k := ComputePathkey(path)
+		k := ComputePathkey(path, fm.Caseins)
 		l, ok := fm.pathmap[k]
 		if !ok {
 			l = &fileitem{}
@@ -89,7 +91,7 @@ func (fm *Filemap) DelFile(path string, fh uint64) {
 		delete(fm.openmap, fh)
 
 		if n != f {
-			k := ComputePathkey(path)
+			k := ComputePathkey(path, fm.Caseins)
 			l, ok := fm.pathmap[k]
 			if ok && l.next == l {
 				delete(fm.pathmap, k)
@@ -112,7 +114,7 @@ func (fm *Filemap) GetFile(path string, fh uint64, okreset bool) (file interface
 }
 
 func (fm *Filemap) Remove(path string) {
-	k := ComputePathkey(path)
+	k := ComputePathkey(path, fm.Caseins)
 	l, ok := fm.pathmap[k]
 	if ok {
 		for f := l.next; l != f; f = f.next {
@@ -126,7 +128,7 @@ func (fm *Filemap) Remove(path string) {
 }
 
 func (fm *Filemap) Rename(path string, oldpath string, newpath string) {
-	k := ComputePathkey(path)
+	k := ComputePathkey(path, fm.Caseins)
 	l, ok := fm.pathmap[k]
 	if ok {
 		for f := l.next; l != f; f = f.next {
@@ -134,7 +136,7 @@ func (fm *Filemap) Rename(path string, oldpath string, newpath string) {
 		}
 
 		delete(fm.pathmap, k)
-		k = ComputePathkey(pathutil.Join(newpath, path[len(oldpath):]))
+		k = ComputePathkey(pathutil.Join(newpath, path[len(oldpath):]), fm.Caseins)
 		fm.pathmap[k] = l
 	}
 }

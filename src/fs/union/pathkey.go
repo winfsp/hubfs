@@ -16,6 +16,7 @@ package union
 import (
 	"crypto/sha256"
 	"hash"
+	"strings"
 )
 
 const Pathkeylen = 16
@@ -23,7 +24,10 @@ const Pathkeylen = 16
 type Pathkey [Pathkeylen]uint8
 
 // Function ComputePathkey computes the path key for a path.
-func ComputePathkey(path string) (k Pathkey) {
+func ComputePathkey(path string, caseins bool) (k Pathkey) {
+	if caseins {
+		path = strings.ToUpper(path)
+	}
 	sum := sha256.Sum256([]uint8(path))
 	copy(k[1:], sum[:])
 	return
@@ -31,13 +35,17 @@ func ComputePathkey(path string) (k Pathkey) {
 
 type PathkeyHash struct {
 	hash.Hash
+	caseins bool
 }
 
-func NewPathkeyHash() PathkeyHash {
-	return PathkeyHash{sha256.New()}
+func NewPathkeyHash(caseins bool) PathkeyHash {
+	return PathkeyHash{sha256.New(), caseins}
 }
 
 func (h PathkeyHash) Write(s string) {
+	if h.caseins {
+		s = strings.ToUpper(s)
+	}
 	h.Hash.Write([]uint8(s))
 }
 

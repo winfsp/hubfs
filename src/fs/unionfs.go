@@ -42,18 +42,18 @@ type file struct {
 	flags int
 }
 
-func NewUnionfs(fslist []fuse.FileSystemInterface) *Unionfs {
+func NewUnionfs(fslist []fuse.FileSystemInterface, caseins bool) *Unionfs {
 	if 0 == len(fslist) {
 		fslist = []fuse.FileSystemInterface{&fuse.FileSystemBase{}}
 	}
 
 	fs := &Unionfs{}
 	fs.fslist = append(fs.fslist, fslist...)
-	_, fs.pathmap = union.OpenPathmap(fs.fslist[0], "/.vismap$")
+	_, fs.pathmap = union.OpenPathmap(fs.fslist[0], "/.pathmap$", caseins)
 	if nil == fs.pathmap {
 		return nil
 	}
-	fs.filemap = union.NewFilemap(fs)
+	fs.filemap = union.NewFilemap(fs, caseins)
 
 	return fs
 }
@@ -134,6 +134,8 @@ func (fs *Unionfs) lsdir(path string,
 	})
 	fs.pathmux.Unlock()
 
+	caseins := fs.pathmap.Caseins
+
 	cont := true
 	for v, fs := range fs.fslist {
 		e, fh := fs.Opendir(path)
@@ -142,7 +144,7 @@ func (fs *Unionfs) lsdir(path string,
 				func(name string, stat *fuse.Stat_t, ofst int64) bool {
 					cont = true
 					if "." != name && ".." != name {
-						if _, ok := minus[union.ComputePathkey(path+name)]; !ok {
+						if _, ok := minus[union.ComputePathkey(path+name, caseins)]; !ok {
 							cont = fill(name, uint8(v), stat)
 						}
 					}
@@ -899,7 +901,7 @@ func (fs *Unionfs) Readdir(path string,
 	unmap := make(map[string]fuse.Stat_t)
 	ufill := func(name string, stat *fuse.Stat_t, ofst int64) bool {
 		if _, ok := unmap[name]; !ok {
-			if _, ok := minus[union.ComputePathkey(path+name)]; !ok {
+			if _, ok := minus[union.ComputePathkey(path+name, fs.pathmap.Caseins)]; !ok {
 				unmap[name] = *stat
 			}
 		}

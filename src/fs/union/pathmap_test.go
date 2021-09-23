@@ -22,13 +22,13 @@ import (
 func TestPathmapOpenClose(t *testing.T) {
 	fs := NewTestfs()
 
-	ec, pm := OpenPathmap(fs, "/.pathmap$")
+	ec, pm := OpenPathmap(fs, "/.pathmap$", false)
 	if 0 != ec {
 		t.Error()
 	}
 	pm.Close()
 
-	ec, pm = OpenPathmap(fs, "/.pathmap$")
+	ec, pm = OpenPathmap(fs, "/.pathmap$", false)
 	if 0 != ec {
 		t.Error()
 	}
@@ -38,7 +38,7 @@ func TestPathmapOpenClose(t *testing.T) {
 func TestPathmapGetSet(t *testing.T) {
 	fs := NewTestfs()
 
-	ec, pm := OpenPathmap(fs, "/.pathmap$")
+	ec, pm := OpenPathmap(fs, "/.pathmap$", false)
 	if 0 != ec {
 		t.Error()
 	}
@@ -121,7 +121,7 @@ func TestPathmapGetSet(t *testing.T) {
 func TestPathmapGetSetOpaque(t *testing.T) {
 	fs := NewTestfs()
 
-	ec, pm := OpenPathmap(fs, "/.pathmap$")
+	ec, pm := OpenPathmap(fs, "/.pathmap$", false)
 	if 0 != ec {
 		t.Error()
 	}
@@ -165,7 +165,7 @@ func TestPathmapGetSetOpaque(t *testing.T) {
 func TestPathmapSetTree(t *testing.T) {
 	fs := NewTestfs()
 
-	ec, pm := OpenPathmap(fs, "/.pathmap$")
+	ec, pm := OpenPathmap(fs, "/.pathmap$", false)
 	if 0 != ec {
 		t.Error()
 	}
@@ -226,7 +226,7 @@ func TestPathmapSetTree(t *testing.T) {
 func TestPathmapWriteIncremental(t *testing.T) {
 	fs := NewTestfs()
 
-	ec, pm := OpenPathmap(fs, "/.pathmap$")
+	ec, pm := OpenPathmap(fs, "/.pathmap$", false)
 	if 0 != ec {
 		t.Error()
 	}
@@ -257,7 +257,7 @@ func TestPathmapWriteIncremental(t *testing.T) {
 		t.Error(e)
 	}
 
-	ec, pm2 := OpenPathmap(fs, "/.pathmap$")
+	ec, pm2 := OpenPathmap(fs, "/.pathmap$", false)
 	if 0 != ec {
 		t.Error()
 	}
@@ -287,7 +287,7 @@ func TestPathmapWriteIncremental(t *testing.T) {
 		t.Error(e)
 	}
 
-	ec, pm2 = OpenPathmap(fs, "/.pathmap$")
+	ec, pm2 = OpenPathmap(fs, "/.pathmap$", false)
 	if 0 != ec {
 		t.Error()
 	}
@@ -339,7 +339,7 @@ func TestPathmapWriteIncremental(t *testing.T) {
 		t.Error(e)
 	}
 
-	ec, pm2 = OpenPathmap(fs, "/.pathmap$")
+	ec, pm2 = OpenPathmap(fs, "/.pathmap$", false)
 	if 0 != ec {
 		t.Error()
 	}
@@ -392,7 +392,7 @@ func TestPathmapWriteIncremental(t *testing.T) {
 		t.Error(e)
 	}
 
-	ec, pm2 = OpenPathmap(fs, "/.pathmap$")
+	ec, pm2 = OpenPathmap(fs, "/.pathmap$", false)
 	if 0 != ec {
 		t.Error()
 	}
@@ -452,7 +452,7 @@ func TestPathmapWriteIncremental(t *testing.T) {
 		t.Error(e)
 	}
 
-	ec, pm2 = OpenPathmap(fs, "/.pathmap$")
+	ec, pm2 = OpenPathmap(fs, "/.pathmap$", false)
 	if 0 != ec {
 		t.Error()
 	}
@@ -513,7 +513,7 @@ func TestPathmapWriteIncremental(t *testing.T) {
 		t.Error(e)
 	}
 
-	ec, pm2 = OpenPathmap(fs, "/.pathmap$")
+	ec, pm2 = OpenPathmap(fs, "/.pathmap$", false)
 	if 0 != ec {
 		t.Error()
 	}
@@ -546,7 +546,7 @@ func TestPathmapWriteIncremental(t *testing.T) {
 func TestPathmapWrite(t *testing.T) {
 	fs := NewTestfs()
 
-	ec, pm := OpenPathmap(fs, "/.pathmap$")
+	ec, pm := OpenPathmap(fs, "/.pathmap$", false)
 	if 0 != ec {
 		t.Error()
 	}
@@ -569,7 +569,7 @@ func TestPathmapWrite(t *testing.T) {
 				t.Error()
 			}
 
-			ec, pm2 := OpenPathmap(fs, "/.pathmap$")
+			ec, pm2 := OpenPathmap(fs, "/.pathmap$", false)
 			if 0 != ec {
 				t.Error()
 			}
@@ -598,7 +598,7 @@ func TestPathmapWrite(t *testing.T) {
 				t.Error()
 			}
 
-			ec, pm2 := OpenPathmap(fs, "/.pathmap$")
+			ec, pm2 := OpenPathmap(fs, "/.pathmap$", false)
 			if 0 != ec {
 				t.Error()
 			}
@@ -624,7 +624,7 @@ func TestPathmapWrite(t *testing.T) {
 				t.Error()
 			}
 
-			ec, pm2 := OpenPathmap(fs, "/.pathmap$")
+			ec, pm2 := OpenPathmap(fs, "/.pathmap$", false)
 			if 0 != ec {
 				t.Error()
 			}
@@ -635,7 +635,7 @@ func TestPathmapWrite(t *testing.T) {
 		}
 	}
 
-	ec, pm2 := OpenPathmap(fs, "/.pathmap$")
+	ec, pm2 := OpenPathmap(fs, "/.pathmap$", false)
 	if 0 != ec {
 		t.Error()
 	}
@@ -651,7 +651,7 @@ func TestPathmapWrite(t *testing.T) {
 func TestPathmapPurge(t *testing.T) {
 	fs := NewTestfs()
 
-	ec, pm := OpenPathmap(fs, "/.pathmap$")
+	ec, pm := OpenPathmap(fs, "/.pathmap$", false)
 	if 0 != ec {
 		t.Error()
 	}
@@ -700,7 +700,7 @@ func TestPathmapPurge(t *testing.T) {
 		t.Error()
 	}
 
-	ec, pm2 := OpenPathmap(fs, "/.pathmap$")
+	ec, pm2 := OpenPathmap(fs, "/.pathmap$", false)
 	if 0 != ec {
 		t.Error()
 	}

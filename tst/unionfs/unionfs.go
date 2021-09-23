@@ -16,6 +16,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/billziss-gh/cgofuse/fuse"
@@ -54,7 +55,15 @@ func main() {
 
 	}
 
-	unfs := fs.NewUnionfs(fslist)
+	caseins := false
+	if "windows" == runtime.GOOS {
+		caseins = true
+	}
+
+	unfs := fs.NewUnionfs(fslist, caseins)
 	host := fuse.NewFileSystemHost(unfs)
+	if caseins {
+		host.SetCapCaseInsensitive(caseins)
+	}
 	host.Mount("", args[1:])
 }

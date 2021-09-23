@@ -28,12 +28,12 @@ func TestPathkeyCompute(t *testing.T) {
 		0x69, 0x8d, 0x16, 0x4a, 0xbe, 0xb3, 0x39, 0x11,
 	}
 
-	k = ComputePathkey("/")
+	k = ComputePathkey("/", false)
 	if k0 != k {
 		t.Error()
 	}
 
-	k = ComputePathkey("/path")
+	k = ComputePathkey("/path", false)
 	if k1 != k {
 		t.Error()
 	}

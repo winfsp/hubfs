@@ -84,12 +84,13 @@ import (
 const Pathmapdbg = true
 
 type Pathmap struct {
-	vm   map[Pathkey]Pathkey              // visibility map
-	hm   map[Pathkey]map[Pathkey]struct{} // hierarchy map
-	fs   fuse.FileSystemInterface         // file system
-	path string                           // path map file name
-	fh   uint64                           // path map file handle
-	ofs  int64                            // path map file offset
+	Caseins bool
+	vm      map[Pathkey]Pathkey              // visibility map
+	hm      map[Pathkey]map[Pathkey]struct{} // hierarchy map
+	fs      fuse.FileSystemInterface         // file system
+	path    string                           // path map file name
+	fh      uint64                           // path map file handle
+	ofs     int64                            // path map file offset
 }
 
 var _pathmapdbg map[Pathkey]string
@@ -107,13 +108,14 @@ const (
 
 // Function OpenPathmap opens a path map file on a file system and
 // returns its in-memory representation.
-func OpenPathmap(fs fuse.FileSystemInterface, path string) (int, *Pathmap) {
+func OpenPathmap(fs fuse.FileSystemInterface, path string, caseins bool) (int, *Pathmap) {
 	pm := &Pathmap{
-		vm:   make(map[Pathkey]Pathkey),
-		hm:   make(map[Pathkey]map[Pathkey]struct{}),
-		fs:   fs,
-		path: path,
-		fh:   ^uint64(0),
+		Caseins: caseins,
+		vm:      make(map[Pathkey]Pathkey),
+		hm:      make(map[Pathkey]map[Pathkey]struct{}),
+		fs:      fs,
+		path:    path,
+		fh:      ^uint64(0),
 	}
 
 	if Pathmapdbg {
@@ -160,7 +162,7 @@ func (pm *Pathmap) Close() {
 func (pm *Pathmap) Get(path string) (isopq bool, v uint8) {
 	var k, p Pathkey
 	var ok bool
-	pkh := NewPathkeyHash()
+	pkh := NewPathkeyHash(pm.Caseins)
 
 	for i, j := 0, 0; ; {
 		for j = i; len(path) > i && '/' == path[i]; i++ {
@@ -214,7 +216,7 @@ func (pm *Pathmap) Set(path string, v uint8) {
 	}
 
 	var k, p Pathkey
-	pkh := NewPathkeyHash()
+	pkh := NewPathkeyHash(pm.Caseins)
 
 	for i, j := 0, 0; ; {
 		for j = i; len(path) > i && '/' == path[i]; i++ {
@@ -265,7 +267,7 @@ func (pm *Pathmap) SetTree(path string, rootv, v uint8) {
 		panic("invalid value")
 	}
 
-	pm.settree(ComputePathkey(path), rootv, v)
+	pm.settree(ComputePathkey(path, pm.Caseins), rootv, v)
 }
 
 func (pm *Pathmap) set(k, p Pathkey, v uint8) {
@@ -330,7 +332,7 @@ func _pathmap_newv(u uint8, v uint8) uint8 {
 
 // Function Enum enumerates visibility information for a directory.
 func (pm *Pathmap) Enum(path string, fn func(k Pathkey, v uint8)) {
-	pm.enum(ComputePathkey(path), fn)
+	pm.enum(ComputePathkey(path, pm.Caseins), fn)
 }
 
 func (pm *Pathmap) enum(k Pathkey, fn func(k Pathkey, v uint8)) {
@@ -688,7 +690,7 @@ func (pm *Pathmap) Dump() {
 		}
 	}
 
-	dump(ComputePathkey(path), 0)
+	dump(ComputePathkey(path, pm.Caseins), 0)
 	fmt.Printf("len(vm)=%v\n", len(pm.vm))
 }
 
@@ -802,7 +804,7 @@ func (pm *Pathmap) SanityCheck() error {
 		pm.enum(k, check)
 	}
 
-	check(ComputePathkey("/"), 0)
+	check(ComputePathkey("/", pm.Caseins), 0)
 
 	if len(pm.vm) != count {
 		errs = append(errs,
