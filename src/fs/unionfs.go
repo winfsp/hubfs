@@ -123,65 +123,40 @@ func (fs *Unionfs) settreevis(path string, rootv, v uint8) {
 }
 
 func (fs *Unionfs) lsdir(path string,
-	fill func(name string, v uint8, stat *fuse.Stat_t) bool) {
+	fill func(name string, stat *fuse.Stat_t, ofst int64) bool) (errc int) {
 
-	minus := make(map[union.Pathkey]struct{})
-	fs.pathmux.Lock()
-	fs.pathmap.Enum(path, func(k union.Pathkey, v uint8) {
-		if union.WHITEOUT == v {
-			minus[k] = struct{}{}
-		}
-	})
-	fs.pathmux.Unlock()
-
-	caseins := fs.pathmap.Caseins
-
-	cont := true
-	for v, fs := range fs.fslist {
-		e, fh := fs.Opendir(path)
-		if 0 == e {
-			fs.Readdir(path,
-				func(name string, stat *fuse.Stat_t, ofst int64) bool {
-					cont = true
-					if "." != name && ".." != name {
-						if _, ok := minus[union.ComputePathkey(pathutil.Join(path, name), caseins)]; !ok {
-							cont = fill(name, uint8(v), stat)
-						}
-					}
-					return cont
-				}, 0, fh)
-			fs.Releasedir(path, fh)
-		}
-		if !cont {
-			break
-		}
+	errc, fh := fs.Opendir(path)
+	if 0 == errc {
+		fs.Readdir(path, fill, 0, fh)
+		fs.Releasedir(path, fh)
 	}
+	return
 }
 
 func (fs *Unionfs) isemptydir(path string) (res bool) {
 	res = true
-	fs.lsdir(path, func(name string, v uint8, stat *fuse.Stat_t) bool {
+	fs.lsdir(path, func(name string, stat *fuse.Stat_t, ofst int64) bool {
 		res = false
 		return res
 	})
 	return
 }
 
-func (fs *Unionfs) mkdirs(path string) (errc int) {
+func (fs *Unionfs) mkpdir(path string) (errc int) {
 	path = pathutil.Dir(path)
 
-	anc := path
-	for "/" != anc {
-		_, _, v := fs.getvis(anc, nil)
+	pdir := path
+	for "/" != pdir {
+		_, _, v := fs.getvis(pdir, nil)
 
 		if 0 == v {
 			break
 		}
 
-		anc = pathutil.Dir(anc)
+		pdir = pathutil.Dir(pdir)
 	}
 
-	for i, j := len(anc), 0; ; {
+	for i, j := len(pdir), 0; ; {
 		for j = i; len(path) > i && '/' == path[i]; i++ {
 		}
 		if j == i {
@@ -198,9 +173,11 @@ func (fs *Unionfs) mkdirs(path string) (errc int) {
 
 		switch v {
 		case union.NOTEXIST, union.WHITEOUT:
+			errc = -fuse.ENOENT
+			break
 		default:
 			if fuse.S_IFDIR != s.Mode&fuse.S_IFMT {
-				errc = -fuse.ENOENT
+				errc = -fuse.ENOTDIR
 				break
 			}
 			if 0 == v {
@@ -208,44 +185,17 @@ func (fs *Unionfs) mkdirs(path string) (errc int) {
 			}
 		}
 
-		errc = fs.fslist[0].Mkdir(path[:i], s.Mode&0777)
+		errc = fs._cpdir(path[:i], v, &s)
 		if 0 != errc {
 			break
 		}
-		fs.setvis(path[:i], 0)
-
-		errc = fs.fslist[0].Chown(path[:i], s.Uid, s.Gid)
-		if -fuse.ENOSYS == errc {
-			errc = 0
-		} else if 0 != errc {
-			break
-		}
 	}
 
 	return
 }
 
-func (fs *Unionfs) cpxattr(path string, v uint8) (errc int) {
-	errc = -fuse.ENOSYS
-	return
-}
-
-func (fs *Unionfs) cpdir(path string, v uint8, stat *fuse.Stat_t) (errc int) {
-	errc = fs.mkdirs(path)
-	if 0 != errc {
-		return
-	}
-
-	srcfs := fs.fslist[v]
+func (fs *Unionfs) _cpdir(path string, v uint8, stat *fuse.Stat_t) (errc int) {
 	dstfs := fs.fslist[0]
-
-	if nil == stat {
-		stat = &fuse.Stat_t{}
-		errc = srcfs.Getattr(path, stat, ^uint64(0))
-		if 0 != errc {
-			return
-		}
-	}
 
 	mode := stat.Mode & 0777
 	errc = dstfs.Mkdir(path, mode)
@@ -260,7 +210,7 @@ func (fs *Unionfs) cpdir(path string, v uint8, stat *fuse.Stat_t) (errc int) {
 		return
 	}
 
-	errc = fs.cpxattr(path, v)
+	errc = fs._cpxattr(path, v)
 	if -fuse.ENOSYS == errc {
 		errc = 0
 	} else if 0 != errc {
@@ -274,12 +224,29 @@ func (fs *Unionfs) cpdir(path string, v uint8, stat *fuse.Stat_t) (errc int) {
 	return
 }
 
-func (fs *Unionfs) cplink(path string, v uint8, stat *fuse.Stat_t) (errc int) {
-	errc = fs.mkdirs(path)
+func (fs *Unionfs) _cpxattr(path string, v uint8) (errc int) {
+	errc = -fuse.ENOSYS
+	return
+}
+
+func (fs *Unionfs) cpdir(path string, v uint8, stat *fuse.Stat_t) (errc int) {
+	if nil == stat {
+		stat = &fuse.Stat_t{}
+		errc = fs.fslist[v].Getattr(path, stat, ^uint64(0))
+		if 0 != errc {
+			return
+		}
+	}
+
+	errc = fs.mkpdir(path)
 	if 0 != errc {
 		return
 	}
 
+	return fs._cpdir(path, v, stat)
+}
+
+func (fs *Unionfs) cplink(path string, v uint8, stat *fuse.Stat_t) (errc int) {
 	srcfs := fs.fslist[v]
 	dstfs := fs.fslist[0]
 
@@ -289,6 +256,11 @@ func (fs *Unionfs) cplink(path string, v uint8, stat *fuse.Stat_t) (errc int) {
 		if 0 != errc {
 			return
 		}
+	}
+
+	errc = fs.mkpdir(path)
+	if 0 != errc {
+		return
 	}
 
 	errc, target := srcfs.Readlink(path)
@@ -308,7 +280,7 @@ func (fs *Unionfs) cplink(path string, v uint8, stat *fuse.Stat_t) (errc int) {
 		return
 	}
 
-	errc = fs.cpxattr(path, v)
+	errc = fs._cpxattr(path, v)
 	if -fuse.ENOSYS == errc {
 		errc = 0
 	} else if 0 != errc {
@@ -323,11 +295,6 @@ func (fs *Unionfs) cplink(path string, v uint8, stat *fuse.Stat_t) (errc int) {
 }
 
 func (fs *Unionfs) cpfile(path string, v uint8, stat *fuse.Stat_t, fh uint64) (errc int) {
-	errc = fs.mkdirs(path)
-	if 0 != errc {
-		return
-	}
-
 	srcfs := fs.fslist[v]
 	dstfs := fs.fslist[0]
 
@@ -345,6 +312,11 @@ func (fs *Unionfs) cpfile(path string, v uint8, stat *fuse.Stat_t, fh uint64) (e
 		if 0 != errc {
 			return
 		}
+	}
+
+	errc = fs.mkpdir(path)
+	if 0 != errc {
+		return
 	}
 
 	mode := stat.Mode & 0777
@@ -372,7 +344,7 @@ func (fs *Unionfs) cpfile(path string, v uint8, stat *fuse.Stat_t, fh uint64) (e
 		return
 	}
 
-	errc = fs.cpxattr(path, v)
+	errc = fs._cpxattr(path, v)
 	if -fuse.ENOSYS == errc {
 		errc = 0
 	} else if 0 != errc {
@@ -412,6 +384,14 @@ func (fs *Unionfs) cpfile(path string, v uint8, stat *fuse.Stat_t, fh uint64) (e
 }
 
 func (fs *Unionfs) cpany(path string, v uint8, stat *fuse.Stat_t) (errc int) {
+	if nil == stat {
+		stat = &fuse.Stat_t{}
+		errc = fs.fslist[v].Getattr(path, stat, ^uint64(0))
+		if 0 != errc {
+			return
+		}
+	}
+
 	switch stat.Mode & fuse.S_IFMT {
 	case fuse.S_IFDIR:
 		errc = fs.cpdir(path, v, stat)
@@ -425,33 +405,31 @@ func (fs *Unionfs) cpany(path string, v uint8, stat *fuse.Stat_t) (errc int) {
 }
 
 func (fs *Unionfs) cptree(path string) (errc int) {
-	fs.lsdir(path, func(name string, v uint8, stat *fuse.Stat_t) bool {
-		p := pathutil.Join(path, name)
+	var s fuse.Stat_t
+	_, _, v := fs.getvis(path, &s)
 
-		if nil == stat {
-			stat = &fuse.Stat_t{}
-			errc = fs.fslist[v].Getattr(p, stat, ^uint64(0))
-			if 0 != errc {
-				return false
-			}
+	switch v {
+	case union.NOTEXIST, union.WHITEOUT:
+		errc = -fuse.ENOENT
+	default:
+		errc = fs.cpany(path, v, &s)
+		if 0 != errc {
+			return
 		}
 
-		if 0 != v {
-			errc = fs.cpany(p, v, stat)
+		if fuse.S_IFDIR == s.Mode&fuse.S_IFMT {
+			e := fs.lsdir(path, func(name string, stat *fuse.Stat_t, ofst int64) bool {
+				errc = fs.cptree(pathutil.Join(path, name))
+				return 0 == errc
+			})
+			if 0 != e {
+				errc = e
+			}
 			if 0 != errc {
-				return false
+				return
 			}
 		}
-
-		if fuse.S_IFDIR == stat.Mode&fuse.S_IFMT {
-			errc = fs.cptree(path)
-			if 0 != errc {
-				return false
-			}
-		}
-
-		return true
-	})
+	}
 
 	return
 }
@@ -464,6 +442,11 @@ func (fs *Unionfs) mknode(path string, isdir bool, fn func(v uint8) int) (errc i
 
 	switch v {
 	case union.NOTEXIST, union.WHITEOUT:
+		errc = fs.mkpdir(path)
+		if 0 != errc {
+			return
+		}
+
 		errc = fn(0)
 		if 0 == errc {
 			if union.WHITEOUT == v && isdir {
