@@ -502,17 +502,17 @@ func (fs *Unionfs) rename(oldpath string, newpath string, fn func(v uint8) int) 
 	return
 }
 
-func (fs *Unionfs) getnode(path string, fn func(v uint8) int) (errc int) {
+func (fs *Unionfs) getnode(path string, fn func(isopq bool, v uint8) int) (errc int) {
 	fs.nsmux.RLock()
 	defer fs.nsmux.RUnlock()
 
-	_, _, v := fs.getvis(path, nil)
+	_, isopq, v := fs.getvis(path, nil)
 
 	switch v {
 	case union.NOTEXIST, union.WHITEOUT:
 		errc = -fuse.ENOENT
 	default:
-		errc = fn(v)
+		errc = fn(isopq, v)
 	}
 
 	return
@@ -728,7 +728,7 @@ func (fs *Unionfs) Symlink(target string, newpath string) (errc int) {
 }
 
 func (fs *Unionfs) Readlink(path string) (errc int, target string) {
-	errc = fs.getnode(path, func(v uint8) int {
+	errc = fs.getnode(path, func(isopq bool, v uint8) int {
 		errc, target = fs.fslist[v].Readlink(path)
 		return errc
 	})
@@ -760,7 +760,7 @@ func (fs *Unionfs) Utimens(path string, tmsp []fuse.Timespec) (errc int) {
 }
 
 func (fs *Unionfs) Access(path string, mask uint32) (errc int) {
-	return fs.getnode(path, func(v uint8) int {
+	return fs.getnode(path, func(isopq bool, v uint8) int {
 		return fs.fslist[v].Access(path, mask)
 	})
 }
@@ -777,7 +777,7 @@ func (fs *Unionfs) Create(path string, flags int, mode uint32) (errc int, fh uin
 }
 
 func (fs *Unionfs) Open(path string, flags int) (errc int, fh uint64) {
-	errc = fs.getnode(path, func(v uint8) int {
+	errc = fs.getnode(path, func(isopq bool, v uint8) int {
 		errc, fh = fs.fslist[v].Open(path, flags)
 		if 0 == errc {
 			fh = fs.newfile(path, false, v, fh, flags)
@@ -873,21 +873,13 @@ func (fs *Unionfs) Fsync(path string, datasync bool, fh uint64) (errc int) {
 }
 
 func (fs *Unionfs) Opendir(path string) (errc int, fh uint64) {
-	fs.nsmux.RLock()
-	defer fs.nsmux.RUnlock()
-
-	_, isopq, v := fs.getvis(path, nil)
-
-	switch v {
-	case union.NOTEXIST, union.WHITEOUT:
-		errc = -fuse.ENOENT
-	default:
+	errc = fs.getnode(path, func(isopq bool, v uint8) int {
 		errc, fh = fs.fslist[v].Opendir(path)
 		if 0 == errc {
 			fh = fs.newfile(path, isopq, v, fh, ^int(0))
 		}
-	}
-
+		return errc
+	})
 	return
 }
 
@@ -986,7 +978,7 @@ func (fs *Unionfs) Setxattr(path string, name string, value []byte, flags int) (
 }
 
 func (fs *Unionfs) Getxattr(path string, name string) (errc int, value []byte) {
-	errc = fs.getnode(path, func(v uint8) int {
+	errc = fs.getnode(path, func(isopq bool, v uint8) int {
 		errc, value = fs.fslist[v].Getxattr(path, name)
 		return errc
 	})
@@ -1000,7 +992,7 @@ func (fs *Unionfs) Removexattr(path string, name string) (errc int) {
 }
 
 func (fs *Unionfs) Listxattr(path string, fill func(name string) bool) (errc int) {
-	return fs.getnode(path, func(v uint8) int {
+	return fs.getnode(path, func(isopq bool, v uint8) int {
 		return fs.fslist[v].Listxattr(path, fill)
 	})
 }
