@@ -239,9 +239,8 @@ func (fs *Unionfs) cpdir(path string, v uint8, stat *fuse.Stat_t) (errc int) {
 	srcfs := fs.fslist[v]
 	dstfs := fs.fslist[0]
 
-	var s fuse.Stat_t
 	if nil == stat {
-		stat = &s
+		stat = &fuse.Stat_t{}
 		errc = srcfs.Getattr(path, stat, ^uint64(0))
 		if 0 != errc {
 			return
@@ -250,6 +249,54 @@ func (fs *Unionfs) cpdir(path string, v uint8, stat *fuse.Stat_t) (errc int) {
 
 	mode := stat.Mode & 0777
 	errc = dstfs.Mkdir(path, mode)
+	if 0 != errc {
+		return
+	}
+
+	errc = dstfs.Chown(path, stat.Uid, stat.Gid)
+	if -fuse.ENOSYS == errc {
+		errc = 0
+	} else if 0 != errc {
+		return
+	}
+
+	errc = fs.cpxattr(path, v)
+	if -fuse.ENOSYS == errc {
+		errc = 0
+	} else if 0 != errc {
+		return
+	}
+
+	if 0 == errc {
+		fs.invfile(path)
+	}
+
+	return
+}
+
+func (fs *Unionfs) cplink(path string, v uint8, stat *fuse.Stat_t) (errc int) {
+	errc = fs.mkdirs(path)
+	if 0 != errc {
+		return
+	}
+
+	srcfs := fs.fslist[v]
+	dstfs := fs.fslist[0]
+
+	if nil == stat {
+		stat = &fuse.Stat_t{}
+		errc = srcfs.Getattr(path, stat, ^uint64(0))
+		if 0 != errc {
+			return
+		}
+	}
+
+	errc, target := srcfs.Readlink(path)
+	if 0 != errc {
+		return
+	}
+
+	errc = dstfs.Symlink(target, path)
 	if 0 != errc {
 		return
 	}
@@ -292,9 +339,8 @@ func (fs *Unionfs) cpfile(path string, v uint8, stat *fuse.Stat_t, fh uint64) (e
 		defer srcfs.Release(path, fh)
 	}
 
-	var s fuse.Stat_t
 	if nil == stat {
-		stat = &s
+		stat = &fuse.Stat_t{}
 		errc = srcfs.Getattr(path, stat, fh)
 		if 0 != errc {
 			return
@@ -366,9 +412,12 @@ func (fs *Unionfs) cpfile(path string, v uint8, stat *fuse.Stat_t, fh uint64) (e
 }
 
 func (fs *Unionfs) cpany(path string, v uint8, stat *fuse.Stat_t) (errc int) {
-	if fuse.S_IFDIR == stat.Mode&fuse.S_IFMT {
+	switch stat.Mode & fuse.S_IFMT {
+	case fuse.S_IFDIR:
 		errc = fs.cpdir(path, v, stat)
-	} else {
+	case fuse.S_IFLNK:
+		errc = fs.cplink(path, v, stat)
+	default:
 		errc = fs.cpfile(path, v, stat, ^uint64(0))
 	}
 
@@ -380,8 +429,7 @@ func (fs *Unionfs) cptree(path string) (errc int) {
 		p := pathutil.Join(path, name)
 
 		if nil == stat {
-			s := fuse.Stat_t{}
-			stat = &s
+			stat = &fuse.Stat_t{}
 			errc = fs.fslist[v].Getattr(p, stat, ^uint64(0))
 			if 0 != errc {
 				return false
