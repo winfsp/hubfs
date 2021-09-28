@@ -39,7 +39,7 @@ func main() {
 		epos--
 	}
 
-	root := args[bpos:epos]
+	root := append([]string{}, args[bpos:epos]...)
 	args = append(args[:bpos], args[epos:]...)
 	if len(root) == 0 {
 		root = []string{"."}
