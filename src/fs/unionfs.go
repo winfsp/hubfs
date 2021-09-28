@@ -379,18 +379,27 @@ func (fs *Unionfs) cptree(path string) (errc int) {
 	fs.lsdir(path, func(name string, v uint8, stat *fuse.Stat_t) bool {
 		p := pathutil.Join(path, name)
 
-		var s fuse.Stat_t
 		if nil == stat {
+			s := fuse.Stat_t{}
 			stat = &s
-			fs.fslist[v].Getattr(p, stat, ^uint64(0))
+			errc = fs.fslist[v].Getattr(p, stat, ^uint64(0))
+			if 0 != errc {
+				return false
+			}
 		}
 
 		if 0 != v {
-			fs.cpany(p, v, stat)
+			errc = fs.cpany(p, v, stat)
+			if 0 != errc {
+				return false
+			}
 		}
 
 		if fuse.S_IFDIR == stat.Mode&fuse.S_IFMT {
-			fs.cptree(path)
+			errc = fs.cptree(path)
+			if 0 != errc {
+				return false
+			}
 		}
 
 		return true
@@ -485,6 +494,7 @@ func (fs *Unionfs) rename(oldpath string, newpath string, fn func(v uint8) int) 
 			errc = fn(0)
 			if 0 == errc {
 				fs.settreevis(oldpath, union.WHITEOUT, union.NOTEXIST)
+				fs.setvis(newpath, 0)
 			}
 		}
 	}
@@ -900,13 +910,17 @@ func (fs *Unionfs) Readdir(path string,
 	})
 	fs.pathmux.Unlock()
 
-	unmap := make(map[string]fuse.Stat_t)
+	unmap := make(map[string]*fuse.Stat_t)
 	ufill := func(name string, stat *fuse.Stat_t, ofst int64) bool {
 		if _, ok := unmap[name]; !ok {
+			if nil != stat {
+				s := *stat
+				stat = &s
+			}
 			if "." == name || ".." == name {
-				unmap[name] = *stat
+				unmap[name] = stat
 			} else if _, ok := minus[union.ComputePathkey(pathutil.Join(path, name), fs.pathmap.Caseins)]; !ok {
-				unmap[name] = *stat
+				unmap[name] = stat
 			}
 		}
 		return true
@@ -931,7 +945,7 @@ func (fs *Unionfs) Readdir(path string,
 
 	for _, n := range names {
 		s := unmap[n]
-		if !fill(n, &s, 0) {
+		if !fill(n, s, 0) {
 			break
 		}
 	}
