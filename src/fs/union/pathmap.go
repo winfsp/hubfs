@@ -260,6 +260,24 @@ func (pm *Pathmap) Set(path string, v uint8) {
 	}
 }
 
+// Function Set sets visibility information if some already exists.
+// Visibility can be one of: opaque, whiteout, notexist, 0, 1, 2, ...
+func (pm *Pathmap) SetIf(path string, v uint8) {
+	if _MAXVIS < v {
+		panic("invalid value")
+	}
+
+	k := ComputePathkey(path, pm.Caseins)
+
+	p, ok := pm.vm[k]
+	if !ok {
+		return
+	}
+
+	p[0] = _pathmap_newv(p[0], v)
+	pm.vm[k] = p
+}
+
 // Function SetTree sets visibility information for a whole tree.
 // Visibility can be one of: opaque, whiteout, notexist, 0, 1, 2, ...
 func (pm *Pathmap) SetTree(path string, rootv, v uint8) {

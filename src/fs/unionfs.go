@@ -116,6 +116,12 @@ func (fs *Unionfs) setvis(path string, v uint8) {
 	fs.pathmux.Unlock()
 }
 
+func (fs *Unionfs) setvisif(path string, v uint8) {
+	fs.pathmux.Lock()
+	fs.pathmap.SetIf(path, v)
+	fs.pathmux.Unlock()
+}
+
 func (fs *Unionfs) settreevis(path string, rootv, v uint8) {
 	fs.pathmux.Lock()
 	fs.pathmap.SetTree(path, rootv, v)
@@ -212,6 +218,7 @@ func (fs *Unionfs) _cpdir(path string, v uint8, stat *fuse.Stat_t) (errc int) {
 	}
 
 	if 0 == errc {
+		fs.setvisif(path, 0)
 		fs.invfile(path)
 	}
 
@@ -282,6 +289,7 @@ func (fs *Unionfs) cplink(path string, v uint8, stat *fuse.Stat_t) (errc int) {
 	}
 
 	if 0 == errc {
+		fs.setvisif(path, 0)
 		fs.invfile(path)
 	}
 
@@ -371,6 +379,7 @@ func (fs *Unionfs) cpfile(path string, v uint8, stat *fuse.Stat_t, fh uint64) (e
 	errc = dstfs.Flush(path, dstfh)
 
 	if 0 == errc {
+		fs.setvisif(path, 0)
 		fs.invfile(path)
 	}
 
@@ -560,7 +569,6 @@ func (fs *Unionfs) setnode(path string, fn func(v uint8) int) (errc int) {
 		if 0 != errc {
 			return
 		}
-		fs.setvis(path, 0)
 		errc = fn(0)
 	}
 
@@ -579,10 +587,7 @@ func (fs *Unionfs) ResetFile(path string, f0 *interface{}) bool {
 	fs.filemux.Unlock()
 
 	fs.nsmux.Lock()
-	e := fs.cpfile(path, v, nil, fh)
-	if 0 == e {
-		fs.setvis(path, 0)
-	}
+	fs.cpfile(path, v, nil, fh)
 	fs.nsmux.Unlock()
 
 	fs.filemux.Lock()
