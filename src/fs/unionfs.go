@@ -156,16 +156,10 @@ func (fs *Unionfs) mkpdir(path string) (errc int) {
 		pdir = pathutil.Dir(pdir)
 	}
 
-	for i, j := len(pdir), 0; ; {
-		for j = i; len(path) > i && '/' == path[i]; i++ {
+	for i := len(pdir); len(path) > i; {
+		for ; len(path) > i && '/' == path[i]; i++ {
 		}
-		if j == i {
-			break
-		}
-		for j = i; len(path) > i && '/' != path[i]; i++ {
-		}
-		if j == i {
-			break
+		for ; len(path) > i && '/' != path[i]; i++ {
 		}
 
 		var s fuse.Stat_t
