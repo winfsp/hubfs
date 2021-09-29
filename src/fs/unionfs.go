@@ -129,22 +129,72 @@ func (fs *Unionfs) settreevis(path string, rootv, v uint8) {
 }
 
 func (fs *Unionfs) lsdir(path string,
-	fill func(name string, stat *fuse.Stat_t, ofst int64) bool) (errc int) {
+	isopq bool, v uint8, fh uint64,
+	fill func(name string, stat *fuse.Stat_t, ofst int64) bool) {
 
-	errc, fh := fs.Opendir(path)
-	if 0 == errc {
-		fs.Readdir(path, fill, 0, fh)
-		fs.Releasedir(path, fh)
+	minus := make(map[union.Pathkey]struct{})
+	fs.pathmux.Lock()
+	fs.pathmap.Enum(path, func(k union.Pathkey, v uint8) {
+		if union.WHITEOUT == v {
+			minus[k] = struct{}{}
+		}
+	})
+	fs.pathmux.Unlock()
+
+	unmap := make(map[string]*fuse.Stat_t)
+	ufill := func(name string, stat *fuse.Stat_t, ofst int64) bool {
+		if _, ok := unmap[name]; ok {
+			return true
+		}
+		if "." == name || ".." == name {
+		} else if _, ok := minus[union.ComputePathkey(pathutil.Join(path, name), fs.pathmap.Caseins)]; ok {
+			return true
+		}
+		if nil != stat {
+			s := *stat
+			stat = &s
+		}
+		unmap[name] = stat
+		return true
 	}
-	return
+
+	if ^uint64(0) != fh {
+		fs.fslist[v].Readdir(path, ufill, 0, fh)
+		v++
+	}
+
+	n := len(fs.fslist)
+	if isopq {
+		n = 1
+	}
+	for i := int(v); n > i; i++ {
+		e, fh := fs.fslist[i].Opendir(path)
+		if 0 == e {
+			fs.fslist[i].Readdir(path, ufill, 0, fh)
+			fs.fslist[i].Releasedir(path, fh)
+		}
+	}
+
+	names := make([]string, 0, len(unmap))
+	for n := range unmap {
+		names = append(names, n)
+	}
+	sort.Strings(names)
+
+	for _, n := range names {
+		s := unmap[n]
+		if !fill(n, s, 0) {
+			break
+		}
+	}
 }
 
-func (fs *Unionfs) isemptydir(path string) (res bool) {
-	res = true
-	fs.lsdir(path, func(name string, stat *fuse.Stat_t, ofst int64) bool {
-		res = false
-		return res
+func (fs *Unionfs) notempty(path string, isopq bool, v uint8) (res bool) {
+	fs.lsdir(path, isopq, v, ^uint64(0), func(name string, stat *fuse.Stat_t, ofst int64) bool {
+		res = !("." == name || ".." == name)
+		return !res
 	})
+
 	return
 }
 
@@ -194,6 +244,42 @@ func (fs *Unionfs) mkpdir(path string) (errc int) {
 	return
 }
 
+func (fs *Unionfs) mktree(path string) (errc int) {
+	var s fuse.Stat_t
+	_, isopq, v := fs.getvis(path, &s)
+
+	switch v {
+	case union.NOTEXIST, union.WHITEOUT:
+		errc = -fuse.ENOENT
+	default:
+		if 0 != v {
+			errc = fs.cpany(path, v, &s)
+			if 0 != errc {
+				return
+			}
+		}
+
+		if !isopq && fuse.S_IFDIR == s.Mode&fuse.S_IFMT {
+			if 0 == v {
+				v++
+			}
+			fs.lsdir(path, isopq, v, ^uint64(0),
+				func(name string, stat *fuse.Stat_t, ofst int64) bool {
+					if "." == name || ".." == name {
+						return true
+					}
+					errc = fs.mktree(pathutil.Join(path, name))
+					return 0 == errc
+				})
+			if 0 != errc {
+				return
+			}
+		}
+	}
+
+	return
+}
+
 func (fs *Unionfs) _cpdir(path string, v uint8, stat *fuse.Stat_t) (errc int) {
 	dstfs := fs.fslist[0]
 
@@ -217,10 +303,8 @@ func (fs *Unionfs) _cpdir(path string, v uint8, stat *fuse.Stat_t) (errc int) {
 		return
 	}
 
-	if 0 == errc {
-		fs.setvisif(path, 0)
-		fs.invfile(path)
-	}
+	fs.setvisif(path, 0)
+	fs.invfile(path)
 
 	return
 }
@@ -288,10 +372,8 @@ func (fs *Unionfs) cplink(path string, v uint8, stat *fuse.Stat_t) (errc int) {
 		return
 	}
 
-	if 0 == errc {
-		fs.setvisif(path, 0)
-		fs.invfile(path)
-	}
+	fs.setvisif(path, 0)
+	fs.invfile(path)
 
 	return
 }
@@ -302,7 +384,7 @@ func (fs *Unionfs) cpfile(path string, v uint8, stat *fuse.Stat_t, fh uint64) (e
 
 	if ^uint64(0) == fh {
 		errc, fh = srcfs.Open(path, fuse.O_RDONLY)
-		if 0 == errc {
+		if 0 != errc {
 			return
 		}
 		defer srcfs.Release(path, fh)
@@ -322,7 +404,7 @@ func (fs *Unionfs) cpfile(path string, v uint8, stat *fuse.Stat_t, fh uint64) (e
 	}
 
 	mode := stat.Mode & 0777
-	errc, dstfh := dstfs.Create(path, fuse.O_RDWR, mode)
+	errc, dstfh := dstfs.Create(path, fuse.O_CREAT|fuse.O_RDWR, mode)
 	if -fuse.ENOSYS == errc {
 		errc = dstfs.Mknod(path, mode, 0)
 		if 0 == errc {
@@ -332,12 +414,7 @@ func (fs *Unionfs) cpfile(path string, v uint8, stat *fuse.Stat_t, fh uint64) (e
 	if 0 != errc {
 		return
 	}
-	defer func() {
-		if 0 != errc {
-			dstfs.Release(path, dstfh)
-			dstfh = ^uint64(0)
-		}
-	}()
+	defer dstfs.Release(path, fh)
 
 	errc = dstfs.Chown(path, stat.Uid, stat.Gid)
 	if -fuse.ENOSYS == errc {
@@ -377,11 +454,14 @@ func (fs *Unionfs) cpfile(path string, v uint8, stat *fuse.Stat_t, fh uint64) (e
 	}
 
 	errc = dstfs.Flush(path, dstfh)
-
-	if 0 == errc {
-		fs.setvisif(path, 0)
-		fs.invfile(path)
+	if -fuse.ENOSYS == errc {
+		errc = 0
+	} else if 0 != errc {
+		return
 	}
+
+	fs.setvisif(path, 0)
+	fs.invfile(path)
 
 	return
 }
@@ -402,36 +482,6 @@ func (fs *Unionfs) cpany(path string, v uint8, stat *fuse.Stat_t) (errc int) {
 		errc = fs.cplink(path, v, stat)
 	default:
 		errc = fs.cpfile(path, v, stat, ^uint64(0))
-	}
-
-	return
-}
-
-func (fs *Unionfs) cptree(path string) (errc int) {
-	var s fuse.Stat_t
-	_, _, v := fs.getvis(path, &s)
-
-	switch v {
-	case union.NOTEXIST, union.WHITEOUT:
-		errc = -fuse.ENOENT
-	default:
-		errc = fs.cpany(path, v, &s)
-		if 0 != errc {
-			return
-		}
-
-		if fuse.S_IFDIR == s.Mode&fuse.S_IFMT {
-			e := fs.lsdir(path, func(name string, stat *fuse.Stat_t, ofst int64) bool {
-				errc = fs.cptree(pathutil.Join(path, name))
-				return 0 == errc
-			})
-			if 0 != e {
-				errc = e
-			}
-			if 0 != errc {
-				return
-			}
-		}
 	}
 
 	return
@@ -470,7 +520,7 @@ func (fs *Unionfs) rmnode(path string, isdir bool, fn func(v uint8) int) (errc i
 	defer fs.nsmux.Unlock()
 
 	var s fuse.Stat_t
-	_, _, v := fs.getvis(path, &s)
+	_, isopq, v := fs.getvis(path, &s)
 
 	switch v {
 	case union.NOTEXIST, union.WHITEOUT:
@@ -478,7 +528,7 @@ func (fs *Unionfs) rmnode(path string, isdir bool, fn func(v uint8) int) (errc i
 	default:
 		if isdir {
 			if fuse.S_IFDIR == s.Mode&fuse.S_IFMT {
-				if !fs.isemptydir(path) {
+				if fs.notempty(path, isopq, v) {
 					return -fuse.ENOTEMPTY
 				}
 			} else {
@@ -509,7 +559,7 @@ func (fs *Unionfs) rename(oldpath string, newpath string, fn func(v uint8) int) 
 
 	var s fuse.Stat_t
 	_, _, oldv := fs.getvis(oldpath, nil)
-	_, _, newv := fs.getvis(newpath, &s)
+	_, newisopq, newv := fs.getvis(newpath, &s)
 
 	switch oldv {
 	case union.NOTEXIST, union.WHITEOUT:
@@ -518,12 +568,12 @@ func (fs *Unionfs) rename(oldpath string, newpath string, fn func(v uint8) int) 
 		switch newv {
 		case union.NOTEXIST, union.WHITEOUT:
 		default:
-			if fuse.S_IFDIR == s.Mode&fuse.S_IFMT && !fs.isemptydir(newpath) {
+			if fuse.S_IFDIR == s.Mode&fuse.S_IFMT && fs.notempty(newpath, newisopq, newv) {
 				return -fuse.ENOTEMPTY
 			}
 		}
 
-		errc = fs.cptree(oldpath)
+		errc = fs.mktree(oldpath)
 		if 0 == errc {
 			errc = fn(0)
 			if 0 == errc {
@@ -740,7 +790,8 @@ func (fs *Unionfs) Link(oldpath string, newpath string) (errc int) {
 		var s fuse.Stat_t
 		_, _, oldv := fs.getvis(oldpath, &s)
 		switch oldv {
-		case union.NOTEXIST, union.WHITEOUT, 0:
+		case union.NOTEXIST, union.WHITEOUT:
+		case 0:
 		default:
 			e := fs.cpany(oldpath, oldv, &s)
 			if 0 != e {
@@ -923,55 +974,7 @@ func (fs *Unionfs) Readdir(path string,
 		return -fuse.EIO
 	}
 
-	minus := make(map[union.Pathkey]struct{})
-	fs.pathmux.Lock()
-	fs.pathmap.Enum(path, func(k union.Pathkey, v uint8) {
-		if union.WHITEOUT == v {
-			minus[k] = struct{}{}
-		}
-	})
-	fs.pathmux.Unlock()
-
-	unmap := make(map[string]*fuse.Stat_t)
-	ufill := func(name string, stat *fuse.Stat_t, ofst int64) bool {
-		if _, ok := unmap[name]; !ok {
-			if nil != stat {
-				s := *stat
-				stat = &s
-			}
-			if "." == name || ".." == name {
-				unmap[name] = stat
-			} else if _, ok := minus[union.ComputePathkey(pathutil.Join(path, name), fs.pathmap.Caseins)]; !ok {
-				unmap[name] = stat
-			}
-		}
-		return true
-	}
-
-	fs.fslist[v].Readdir(path, ufill, 0, fh)
-	if !isopq {
-		for i := int(v) + 1; len(fs.fslist) > i; i++ {
-			errc, fh := fs.fslist[i].Opendir(path)
-			if 0 == errc {
-				fs.fslist[i].Readdir(path, ufill, 0, fh)
-				fs.fslist[i].Releasedir(path, fh)
-			}
-		}
-	}
-
-	names := make([]string, 0, len(unmap))
-	for n := range unmap {
-		names = append(names, n)
-	}
-	sort.Strings(names)
-
-	for _, n := range names {
-		s := unmap[n]
-		if !fill(n, s, 0) {
-			break
-		}
-	}
-
+	fs.lsdir(path, isopq, v, fh, fill)
 	return 0
 }
 
