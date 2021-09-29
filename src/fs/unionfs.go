@@ -132,29 +132,16 @@ func (fs *Unionfs) lsdir(path string,
 	isopq bool, v uint8, fh uint64,
 	fill func(name string, stat *fuse.Stat_t, ofst int64) bool) {
 
-	minus := make(map[union.Pathkey]struct{})
-	fs.pathmux.Lock()
-	fs.pathmap.Enum(path, func(k union.Pathkey, v uint8) {
-		if union.WHITEOUT == v {
-			minus[k] = struct{}{}
-		}
-	})
-	fs.pathmux.Unlock()
-
-	unmap := make(map[string]*fuse.Stat_t)
+	nmmap := make(map[string]*fuse.Stat_t)
 	ufill := func(name string, stat *fuse.Stat_t, ofst int64) bool {
-		if _, ok := unmap[name]; ok {
-			return true
-		}
-		if "." == name || ".." == name {
-		} else if _, ok := minus[union.ComputePathkey(pathutil.Join(path, name), fs.pathmap.Caseins)]; ok {
+		if _, ok := nmmap[name]; ok {
 			return true
 		}
 		if nil != stat {
 			s := *stat
 			stat = &s
 		}
-		unmap[name] = stat
+		nmmap[name] = stat
 		return true
 	}
 
@@ -175,15 +162,20 @@ func (fs *Unionfs) lsdir(path string,
 		}
 	}
 
-	names := make([]string, 0, len(unmap))
-	for n := range unmap {
-		names = append(names, n)
+	names := make([]string, 0, len(nmmap))
+	fs.pathmux.Lock()
+	for name := range nmmap {
+		_, v = fs.pathmap.Get(pathutil.Join(path, name))
+		if union.WHITEOUT != v {
+			names = append(names, name)
+		}
 	}
+	fs.pathmux.Unlock()
 	sort.Strings(names)
 
-	for _, n := range names {
-		s := unmap[n]
-		if !fill(n, s, 0) {
+	for _, name := range names {
+		s := nmmap[name]
+		if !fill(name, s, 0) {
 			break
 		}
 	}
