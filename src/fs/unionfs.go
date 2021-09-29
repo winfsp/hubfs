@@ -49,7 +49,7 @@ func NewUnionfs(fslist []fuse.FileSystemInterface, caseins bool) *Unionfs {
 
 	fs := &Unionfs{}
 	fs.fslist = append(fs.fslist, fslist...)
-	_, fs.pathmap = union.OpenPathmap(fs.fslist[0], "/.pathmap$", caseins)
+	_, fs.pathmap = union.OpenPathmap(fs.fslist[0], "/.unionfs", caseins)
 	if nil == fs.pathmap {
 		return nil
 	}
