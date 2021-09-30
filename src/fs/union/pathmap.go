@@ -208,6 +208,15 @@ func (pm *Pathmap) Get(path string) (isopq bool, v uint8) {
 	return
 }
 
+// Function Has returns if visibility information already exists.
+func (pm *Pathmap) Has(path string) bool {
+	k := ComputePathkey(path, pm.Caseins)
+
+	_, ok := pm.vm[k]
+
+	return ok
+}
+
 // Function Set sets visibility information.
 // Visibility can be one of: opaque, whiteout, notexist, 0, 1, 2, ...
 func (pm *Pathmap) Set(path string, v uint8) {
