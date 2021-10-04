@@ -473,7 +473,9 @@ func (fs *Unionfs) cptree(path string, v uint8, stat *fuse.Stat_t, paths *[]stri
 
 	if 0 != v {
 		errc = fs.cpany(path, v, stat)
-		if 0 != errc {
+		if -fuse.EEXIST == errc {
+			errc = 0
+		} else if 0 != errc {
 			return
 		}
 	}
