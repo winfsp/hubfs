@@ -170,10 +170,13 @@ func (fs *Unionfs) lsdir(path string,
 	names := make([]string, 0, len(dirmap))
 	fs.pathmux.Lock()
 	for name := range dirmap {
-		_, v = fs.pathmap.Get(pathutil.Join(path, name))
-		if union.WHITEOUT != v {
-			names = append(names, name)
+		if !("." == name || ".." == name) {
+			_, v = fs.pathmap.Get(pathutil.Join(path, name))
+			if union.WHITEOUT == v {
+				continue
+			}
 		}
+		names = append(names, name)
 	}
 	fs.pathmux.Unlock()
 	sort.Strings(names)
@@ -350,21 +353,21 @@ func (fs *Unionfs) cplink(path string, v uint8, stat *fuse.Stat_t) (errc int) {
 	return
 }
 
-func (fs *Unionfs) cpfile(path string, v uint8, stat *fuse.Stat_t, fh uint64) (errc int) {
+func (fs *Unionfs) cpfile(path string, v uint8, stat *fuse.Stat_t, srcfh uint64) (errc int) {
 	srcfs := fs.fslist[v]
 	dstfs := fs.fslist[0]
 
-	if ^uint64(0) == fh {
-		errc, fh = srcfs.Open(path, fuse.O_RDONLY)
+	if ^uint64(0) == srcfh {
+		errc, srcfh = srcfs.Open(path, fuse.O_RDONLY)
 		if 0 != errc {
 			return
 		}
-		defer srcfs.Release(path, fh)
+		defer srcfs.Release(path, srcfh)
 	}
 
 	if nil == stat {
 		stat = &fuse.Stat_t{}
-		errc = srcfs.Getattr(path, stat, fh)
+		errc = srcfs.Getattr(path, stat, srcfh)
 		if 0 != errc {
 			return
 		}
@@ -386,7 +389,7 @@ func (fs *Unionfs) cpfile(path string, v uint8, stat *fuse.Stat_t, fh uint64) (e
 	if 0 != errc {
 		return
 	}
-	defer dstfs.Release(path, fh)
+	defer dstfs.Release(path, dstfh)
 
 	errc = dstfs.Chown(path, stat.Uid, stat.Gid)
 	if -fuse.ENOSYS == errc {
@@ -405,7 +408,7 @@ func (fs *Unionfs) cpfile(path string, v uint8, stat *fuse.Stat_t, fh uint64) (e
 	buf := make([]byte, 64*1024)
 	ofs := int64(0)
 	for {
-		n := srcfs.Read(path, buf, ofs, fh)
+		n := srcfs.Read(path, buf, ofs, srcfh)
 		if 0 > n {
 			errc = n
 			return
