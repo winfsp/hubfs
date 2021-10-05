@@ -33,7 +33,12 @@ type testrun struct {
 	fs     fuse.FileSystemInterface
 }
 
-var testrunCount = 0
+var (
+	testrunCount = 0
+	maxcnt       = 100
+	pctdir       = 20
+	pctact       = 10
+)
 
 func newtestrun(seed int64) *testrun {
 	if 0 == seed {
@@ -173,27 +178,33 @@ func (t *testrun) randaction(pctact int) (errc int) {
 		paths = append(paths, path)
 	}
 	sort.Strings(paths)
-	t.r.Shuffle(len(paths), func(i, j int) {
-		paths[i], paths[j] = paths[j], paths[i]
-	})
 
-	for _, path := range paths {
-		if _, ok := t.paths[path]; !ok {
-			continue
+	path := paths[t.r.Int()%len(paths)]
+	action := t.r.Int() % 100
+	switch {
+	case action < pctact*1:
+		errc = t.rmtree(path)
+		if 0 == errc && action < pctact/2 {
+			errc = t.mkdir(path, 0777)
 		}
-
-		action := t.r.Int() % 100
-
-		switch {
-		case action < pctact*1:
-			errc = t.rmtree(path)
-			if 0 == errc && action < pctact/2 {
-				errc = t.mkdir(path, 0777)
+	case action < pctact*2:
+		errc = t.rename(path)
+	case action < pctact*3:
+		stat := fuse.Stat_t{}
+		errc = t.fs.Getattr(path, &stat, ^uint64(0))
+		if 0 == errc {
+			if fuse.S_IFDIR == stat.Mode&fuse.S_IFMT {
+				errc = t.populate(path, maxcnt, pctdir)
 			}
-		case action < pctact*2:
-			errc = t.rename(path)
 		}
+	}
 
+	return
+}
+
+func (t *testrun) randactions(pctact int) (errc int) {
+	for i, n := 0, len(t.paths); n > i; i++ {
+		errc = t.randaction(pctact)
 		if 0 != errc {
 			return
 		}
@@ -216,7 +227,7 @@ func (t *testrun) exercise(fs1, fs2, fs3 fuse.FileSystemInterface, maxcnt int, p
 	}
 
 	t.fs = fs3
-	errc = t.randaction(pctact)
+	errc = t.randactions(pctact)
 	if 0 != errc {
 		return
 	}
@@ -343,13 +354,7 @@ func TestUnionfs(t *testing.T) {
 	//trace.Verbose = true
 
 	seed := time.Now().UnixNano()
-	//seed = int64(1633357707045800000)
-	//seed = int64(1633360140471599000)
 	fmt.Println("seed =", seed)
-
-	maxcnt := 100
-	pctdir := 20
-	pctact := 10
 
 	cfs := NewTestfs()
 	fs1 := NewTestfs()
@@ -371,21 +376,6 @@ func TestUnionfs(t *testing.T) {
 	errc = t2.exercise(fs1, fs2, ufs, maxcnt, pctdir, pctact)
 	if 0 != errc {
 		t.Errorf("[ufs] exercise: %v (seed=%v)", errc, seed)
-	}
-
-	err = compare(cfs, ufs)
-	if nil != err {
-		t.Errorf("%v (seed=%v)", err, seed)
-	}
-
-	errc = t1.exercise(cfs, cfs, cfs, maxcnt, pctdir, pctact)
-	if 0 != errc {
-		t.Errorf("[cfs] exercise: %v (seed=%v)", errc, seed)
-	}
-
-	errc = t2.exercise(ufs, ufs, ufs, maxcnt, pctdir, pctact)
-	if 0 != errc {
-		t.Errorf("[ufs] exercise: %v  (seed=%v)", errc, seed)
 	}
 
 	err = compare(cfs, ufs)
