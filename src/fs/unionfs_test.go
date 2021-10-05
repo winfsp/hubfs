@@ -29,7 +29,7 @@ import (
 type testrun struct {
 	prefix string
 	r      *rand.Rand
-	paths  map[string]struct{}
+	paths  []string
 	fs     fuse.FileSystemInterface
 }
 
@@ -48,7 +48,6 @@ func newtestrun(seed int64) *testrun {
 	return &testrun{
 		prefix: fmt.Sprintf("TEST%d", testrunCount),
 		r:      rand.New(rand.NewSource(seed)),
-		paths:  make(map[string]struct{}),
 	}
 }
 
@@ -61,6 +60,18 @@ func (t *testrun) randname() string {
 	return string(namebuf)
 }
 
+func (t *testrun) inspath(path string) {
+	i := sort.SearchStrings(t.paths, path)
+	t.paths = append(t.paths, "")
+	copy(t.paths[i+1:], t.paths[i:])
+	t.paths[i] = path
+}
+
+func (t *testrun) delpath(path string) {
+	i := sort.SearchStrings(t.paths, path)
+	t.paths = append(t.paths[:i], t.paths[i+1:]...)
+}
+
 func (t *testrun) mkdir(path string, mode uint32) (errc int) {
 	defer trace.Trace(0, t.prefix, path)(&errc)
 
@@ -69,7 +80,7 @@ func (t *testrun) mkdir(path string, mode uint32) (errc int) {
 		return
 	}
 
-	t.paths[path] = struct{}{}
+	t.inspath(path)
 
 	return
 }
@@ -102,7 +113,7 @@ func (t *testrun) mkfile(path string, mode uint32, buf []uint8) (errc int) {
 		return
 	}
 
-	t.paths[path] = struct{}{}
+	t.inspath(path)
 
 	return
 }
@@ -118,7 +129,7 @@ func (t *testrun) remove(path string) (errc int) {
 		return
 	}
 
-	delete(t.paths, path)
+	t.delpath(path)
 
 	return
 }
@@ -133,22 +144,15 @@ func (t *testrun) rename(path string) (errc int) {
 	newpath := pathutil.Join(pathutil.Dir(path), t.randname())
 	defer trace.Trace(0, t.prefix, path, newpath)(&errc)
 
-	renpaths := []string{}
-	errc += enumerate(t.fs, path, false, func(path string) int {
-		renpaths = append(renpaths, path)
-		return 0
-	})
-
 	errc = t.fs.Rename(path, newpath)
 	if 0 != errc {
 		return
 	}
 
-	for _, p := range renpaths {
-		newp := newpath + p[len(path):]
-		delete(t.paths, p)
-		t.paths[newp] = struct{}{}
+	for i := sort.SearchStrings(t.paths, path); len(t.paths) > i && hasPathPrefix(t.paths[i], path); i++ {
+		t.paths[i] = newpath + t.paths[i][len(path):]
 	}
+	sort.Strings(t.paths)
 
 	return
 }
@@ -173,13 +177,7 @@ func (t *testrun) populate(path string, maxcnt int, pctdir int) (errc int) {
 }
 
 func (t *testrun) randaction(pctact int) (errc int) {
-	paths := []string{}
-	for path := range t.paths {
-		paths = append(paths, path)
-	}
-	sort.Strings(paths)
-
-	path := paths[t.r.Int()%len(paths)]
+	path := t.paths[t.r.Int()%len(t.paths)]
 	action := t.r.Int() % 100
 	switch {
 	case action < pctact*1:
@@ -347,6 +345,11 @@ func compare(fs1, fs2 fuse.FileSystemInterface) (err error) {
 	}
 
 	return nil
+}
+
+func hasPathPrefix(path, prefix string) bool {
+	return path == prefix ||
+		(len(path) >= len(prefix) && path[:len(prefix)] == prefix && path[len(prefix)] == '/')
 }
 
 func TestUnionfs(t *testing.T) {
