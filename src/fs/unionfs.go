@@ -170,11 +170,12 @@ func (fs *Unionfs) lsdir(path string,
 	names := make([]string, 0, len(dirmap))
 	fs.pathmux.Lock()
 	for name := range dirmap {
-		if !("." == name || ".." == name) {
-			_, v = fs.pathmap.Get(pathutil.Join(path, name))
-			if union.WHITEOUT == v {
-				continue
-			}
+		if "." == name || ".." == name {
+			continue
+		}
+		_, v = fs.pathmap.Get(pathutil.Join(path, name))
+		if union.WHITEOUT == v {
+			continue
 		}
 		names = append(names, name)
 	}
@@ -182,7 +183,11 @@ func (fs *Unionfs) lsdir(path string,
 	sort.Strings(names)
 
 	if ^uint64(0) != fh {
-		// Readdir: pass 0 offset as required by FUSE
+		// Readdir: pass dot dirs and 0 offset as required by FUSE
+		if dot, ok := dirmap["."]; ok {
+			fill(".", dot.stat, 0)
+			fill("..", nil, 0)
+		}
 		for _, name := range names {
 			ent := dirmap[name]
 			if !fill(name, ent.stat, 0) {
@@ -202,8 +207,8 @@ func (fs *Unionfs) lsdir(path string,
 
 func (fs *Unionfs) notempty(path string, isopq bool, v uint8) (res bool) {
 	fs.lsdir(path, isopq, v, ^uint64(0), func(name string, stat *fuse.Stat_t, ofst int64) bool {
-		res = !("." == name || ".." == name)
-		return !res
+		res = true
+		return false
 	})
 
 	return
@@ -484,14 +489,10 @@ func (fs *Unionfs) cptree(path string, v uint8, stat *fuse.Stat_t, paths *[]stri
 		if 0 == v {
 			v++
 		}
-		fs.lsdir(path, false, v, ^uint64(0),
-			func(name string, stat *fuse.Stat_t, ofst int64) bool {
-				if "." == name || ".." == name {
-					return true
-				}
-				errc = fs.cptree(pathutil.Join(path, name), uint8(ofst), stat, paths)
-				return 0 == errc
-			})
+		fs.lsdir(path, false, v, ^uint64(0), func(name string, stat *fuse.Stat_t, ofst int64) bool {
+			errc = fs.cptree(pathutil.Join(path, name), uint8(ofst), stat, paths)
+			return 0 == errc
+		})
 	}
 
 	if 0 == errc && fs.hasvis(path) {
