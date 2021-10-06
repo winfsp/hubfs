@@ -215,6 +215,23 @@ func (t *testrun) randaction(pctact int) (errc int) {
 		}
 	case action < pctact*4:
 		errc = t.fs.Chmod(path, 0742)
+	case action < pctact*5:
+		fh := uint64(0)
+		errc, fh = t.fs.Open(path, fuse.O_RDWR)
+		if -fuse.EISDIR == errc {
+			errc = 0
+		} else if 0 == errc {
+			defer t.fs.Release(path, fh)
+			buf := [4096]uint8{}
+			n := t.fs.Read(path, buf[:], 0, fh)
+			if 0 > n {
+				return n
+			}
+			n = t.fs.Write(path, buf[:n], int64(n), fh)
+			if 0 > n {
+				return n
+			}
+		}
 	}
 
 	return

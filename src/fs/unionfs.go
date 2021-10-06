@@ -648,7 +648,7 @@ func (fs *Unionfs) setnode(path string, fn func(v uint8) int) (errc int) {
 	return
 }
 
-func (fs *Unionfs) ResetFile(path string, f0 interface{}) bool {
+func (fs *Unionfs) CopyFile(path string, f0 interface{}) bool {
 	f := f0.(*file)
 	if 0 == f.v {
 		return false

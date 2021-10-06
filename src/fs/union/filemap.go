@@ -14,7 +14,7 @@
 package union
 
 type Filer interface {
-	ResetFile(path string, file interface{}) bool
+	CopyFile(path string, file interface{}) bool
 	ReopenFile(oldpath string, newpath string, file interface{})
 }
 
@@ -98,10 +98,9 @@ func (fm *Filemap) DelFile(path string, fh uint64) {
 func (fm *Filemap) GetFile(path string, fh uint64, okreset bool) (file interface{}) {
 	f, ok := fm.openmap[fh]
 	if ok {
-		if okreset && fm.Filer.ResetFile(path, f.file) {
+		if okreset && fm.Filer.CopyFile(path, f.file) {
 			f, ok = fm.openmap[fh]
 			if ok {
-				fm.Filer.ReopenFile(path, path, f.file)
 				file = f.file
 			}
 		} else {
