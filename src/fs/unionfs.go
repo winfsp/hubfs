@@ -648,14 +648,18 @@ func (fs *Unionfs) setnode(path string, fn func(v uint8) int) (errc int) {
 	return
 }
 
-func (fs *Unionfs) ResetFile(path string, f0 *interface{}) bool {
-	f := (*f0).(*file)
+func (fs *Unionfs) ResetFile(path string, f0 interface{}) bool {
+	f := f0.(*file)
 	if 0 == f.v {
 		return false
 	}
 
 	v := f.v
-	fh := f.fh
+	fh := ^uint64(0)
+	switch f.flags & (fuse.O_RDONLY | fuse.O_WRONLY | fuse.O_RDWR) {
+	case fuse.O_RDONLY, fuse.O_RDWR:
+		fh = f.fh
+	}
 
 	fs.filemux.Unlock()
 
@@ -668,37 +672,27 @@ func (fs *Unionfs) ResetFile(path string, f0 *interface{}) bool {
 	return true
 }
 
-func (fs *Unionfs) ValidateFile(path string, f0 *interface{}) {
-	if "" == path {
-		return
+func (fs *Unionfs) ReopenFile(oldpath string, newpath string, f0 interface{}) {
+	f := f0.(*file)
+
+	if "" != oldpath && ^uint64(0) != f.fh {
+		if ^int(0) != f.flags {
+			fs.fslist[f.v].Release(oldpath, f.fh)
+		} else {
+			fs.fslist[f.v].Releasedir(oldpath, f.fh)
+		}
+
+		f.v = 0
+		f.fh = ^uint64(0)
 	}
 
-	f := (*f0).(*file)
-	if ^uint64(0) != f.fh {
-		return
+	if "" != newpath && ^uint64(0) == f.fh {
+		if ^int(0) != f.flags {
+			_, f.fh = fs.fslist[f.v].Open(newpath, f.flags)
+		} else {
+			_, f.fh = fs.fslist[f.v].Opendir(newpath)
+		}
 	}
-
-	if ^int(0) != f.flags {
-		_, f.fh = fs.fslist[f.v].Open(path, f.flags)
-	} else {
-		_, f.fh = fs.fslist[f.v].Opendir(path)
-	}
-}
-
-func (fs *Unionfs) InvalidateFile(path string, f0 *interface{}) {
-	f := (*f0).(*file)
-	if ^uint64(0) == f.fh {
-		return
-	}
-
-	if ^int(0) != f.flags {
-		fs.fslist[f.v].Release(path, f.fh)
-	} else {
-		fs.fslist[f.v].Releasedir(path, f.fh)
-	}
-
-	f.v = 0
-	f.fh = ^uint64(0)
 }
 
 func (fs *Unionfs) newfile(path string, isopq bool, v uint8, fh uint64, flags int) (wrapfh uint64) {

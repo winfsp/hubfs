@@ -13,14 +13,9 @@
 
 package union
 
-import (
-	pathutil "path"
-)
-
 type Filer interface {
-	ResetFile(path string, file *interface{}) bool
-	ValidateFile(path string, file *interface{})
-	InvalidateFile(path string, file *interface{})
+	ResetFile(path string, file interface{}) bool
+	ReopenFile(oldpath string, newpath string, file interface{})
 }
 
 type Filemap struct {
@@ -102,12 +97,16 @@ func (fm *Filemap) DelFile(path string, fh uint64) {
 
 func (fm *Filemap) GetFile(path string, fh uint64, okreset bool) (file interface{}) {
 	f, ok := fm.openmap[fh]
-	if ok && okreset && fm.Filer.ResetFile(path, &f.file) {
-		f, ok = fm.openmap[fh]
-	}
 	if ok {
-		fm.Filer.ValidateFile(path, &f.file)
-		file = f.file
+		if okreset && fm.Filer.ResetFile(path, f.file) {
+			f, ok = fm.openmap[fh]
+			if ok {
+				fm.Filer.ReopenFile(path, path, f.file)
+				file = f.file
+			}
+		} else {
+			file = f.file
+		}
 	}
 
 	return
@@ -118,7 +117,7 @@ func (fm *Filemap) Remove(path string) {
 	l, ok := fm.pathmap[k]
 	if ok {
 		for f := l.next; l != f; {
-			fm.Filer.InvalidateFile(path, &f.file)
+			fm.Filer.ReopenFile(path, path, f.file)
 			n := f.next
 			f.prev = f
 			f.next = f
@@ -126,19 +125,5 @@ func (fm *Filemap) Remove(path string) {
 		}
 
 		delete(fm.pathmap, k)
-	}
-}
-
-func (fm *Filemap) Rename(path string, oldpath string, newpath string) {
-	k := ComputePathkey(path, fm.Caseins)
-	l, ok := fm.pathmap[k]
-	if ok {
-		for f := l.next; l != f; f = f.next {
-			fm.Filer.InvalidateFile(path, &f.file)
-		}
-
-		delete(fm.pathmap, k)
-		k = ComputePathkey(pathutil.Join(newpath, path[len(oldpath):]), fm.Caseins)
-		fm.pathmap[k] = l
 	}
 }
