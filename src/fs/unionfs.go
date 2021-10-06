@@ -881,7 +881,7 @@ func (fs *Unionfs) Open(path string, flags int) (errc int, fh uint64) {
 	errc = fs.getnode(path, func(isopq bool, v uint8) int {
 		errc, fh = fs.fslist[v].Open(path, flags)
 		if 0 == errc {
-			fh = fs.newfile(path, false, v, fh, flags)
+			fh = fs.newfile(path, false, v, fh, flags&(fuse.O_RDONLY|fuse.O_WRONLY|fuse.O_RDWR))
 		}
 		return errc
 	})
