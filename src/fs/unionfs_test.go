@@ -213,6 +213,8 @@ func (t *testrun) randaction(pctact int) (errc int) {
 				errc = t.populate(path, maxcnt, pctdir)
 			}
 		}
+	case action < pctact*4:
+		errc = t.fs.Chmod(path, 0742)
 	}
 
 	return
@@ -349,6 +351,20 @@ func compare(fs1, fs2 fuse.FileSystemInterface) (err error) {
 	}
 
 	for i := 0; len(paths1) > i; i++ {
+		stat1 := fuse.Stat_t{}
+		e1 := fs1.Getattr(paths1[i], &stat1, ^uint64(0))
+		if 0 != e1 {
+			return errors.New("0 != e1")
+		}
+		stat2 := fuse.Stat_t{}
+		e2 := fs2.Getattr(paths2[i], &stat2, ^uint64(0))
+		if 0 != e2 {
+			return errors.New("0 != e2")
+		}
+		if stat1.Mode != stat2.Mode {
+			return errors.New("stat1.Mode != stat2.Mode")
+		}
+
 		e1, data1 := readstring(fs1, paths1[i])
 		if 0 != e1 {
 			return errors.New("0 != e1")
