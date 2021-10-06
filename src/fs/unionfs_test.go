@@ -144,6 +144,24 @@ func (t *testrun) rename(path string) (errc int) {
 	newpath := pathutil.Join(pathutil.Dir(path), t.randname())
 	defer trace.Trace(0, t.prefix, path, newpath)(&errc)
 
+	files := []*testFile{}
+	defer func() {
+		for _, file := range files {
+			e := testCloseFile(t.fs, file)
+			if 0 == errc {
+				errc = e
+			}
+		}
+	}()
+	for i := sort.SearchStrings(t.paths, path); len(t.paths) > i && hasPathPrefix(t.paths[i], path); i++ {
+		e, file := testOpenFile(t.fs, t.paths[i])
+		if 0 != e {
+			errc = e
+			return
+		}
+		files = append(files, file)
+	}
+
 	errc = t.fs.Rename(path, newpath)
 	if 0 != errc {
 		return
@@ -291,7 +309,7 @@ func readstring(fs fuse.FileSystemInterface, path string) (errc int, data string
 	}
 	defer fs.Release(path, fh)
 
-	buf := [1024]uint8{}
+	buf := [4096]uint8{}
 	n := fs.Read(path, buf[:], 0, fh)
 	if 0 > n {
 		return n, ""
@@ -350,6 +368,58 @@ func compare(fs1, fs2 fuse.FileSystemInterface) (err error) {
 func hasPathPrefix(path, prefix string) bool {
 	return path == prefix ||
 		(len(path) >= len(prefix) && path[:len(prefix)] == prefix && path[len(prefix)] == '/')
+}
+
+type testFile struct {
+	path  string
+	fh    uint64
+	isdir bool
+	data  string
+}
+
+func testOpenFile(fs fuse.FileSystemInterface, path string) (errc int, file *testFile) {
+	isdir := false
+	errc, fh := fs.Open(path, fuse.O_RDWR)
+	if -fuse.EISDIR == errc {
+		isdir = true
+		errc, fh = fs.Opendir(path)
+	}
+	if 0 != errc {
+		return
+	}
+
+	data := ""
+	if !isdir {
+		buf := [4096]uint8{}
+		n := fs.Read(path, buf[:], 0, fh)
+		if 0 > n {
+			return n, nil
+		}
+		data = string(buf[:n])
+	}
+
+	file = &testFile{path, fh, isdir, data}
+	return
+}
+
+func testCloseFile(fs fuse.FileSystemInterface, file *testFile) (errc int) {
+	if !file.isdir {
+		buf := [4096]uint8{}
+		n := fs.Read(file.path, buf[:], 0, file.fh)
+		if 0 > n {
+			return n
+		}
+		if string(buf[:n]) != file.data {
+			return -fuse.EIO
+		}
+
+		fs.Flush(file.path, file.fh)
+		errc = fs.Release(file.path, file.fh)
+	} else {
+		errc = fs.Releasedir(file.path, file.fh)
+	}
+
+	return
 }
 
 func TestUnionfs(t *testing.T) {

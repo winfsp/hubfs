@@ -117,10 +117,12 @@ func (fm *Filemap) Remove(path string) {
 	k := ComputePathkey(path, fm.Caseins)
 	l, ok := fm.pathmap[k]
 	if ok {
-		for f := l.next; l != f; f = f.next {
+		for f := l.next; l != f; {
 			fm.Filer.InvalidateFile(path, &f.file)
+			n := f.next
 			f.prev = f
 			f.next = f
+			f = n
 		}
 
 		delete(fm.pathmap, k)

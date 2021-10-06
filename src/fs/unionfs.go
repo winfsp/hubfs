@@ -696,6 +696,9 @@ func (fs *Unionfs) InvalidateFile(path string, f0 *interface{}) {
 	} else {
 		fs.fslist[f.v].Releasedir(path, f.fh)
 	}
+
+	f.v = 0
+	f.fh = ^uint64(0)
 }
 
 func (fs *Unionfs) newfile(path string, isopq bool, v uint8, fh uint64, flags int) (wrapfh uint64) {
