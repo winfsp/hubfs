@@ -190,7 +190,7 @@ func (t *testrun) move(path string) (errc int) {
 
 	errc = t.rename(path, newpath)
 	switch errc {
-	case -fuse.EISDIR, -fuse.ENOTDIR, -fuse.ENOTEMPTY:
+	case -fuse.EISDIR, -fuse.ENOTDIR, -fuse.ENOTEMPTY, -fuse.EINVAL:
 		// retry renaming to a random name
 		newpath = pathutil.Join(pdir, t.randname())
 		errc = t.rename(path, newpath)
@@ -206,6 +206,29 @@ func (t *testrun) move(path string) (errc int) {
 		t.paths[i] = newpath + t.paths[i][len(path):]
 	}
 	sort.Strings(t.paths)
+
+	return
+}
+
+func (t *testrun) link(path string) (errc int) {
+	stat := fuse.Stat_t{}
+	errc = t.fs.Getattr(path, &stat, ^uint64(0))
+	if 0 == errc && fuse.S_IFDIR == stat.Mode&fuse.S_IFMT {
+		// cannot link directories
+		return
+	}
+
+	pdir := pathutil.Dir(path)
+	newpath := pathutil.Join(pdir, t.randname())
+
+	defer trace.Trace(0, t.prefix, path, newpath)(&errc)
+
+	errc = t.fs.Link(path, newpath)
+	if 0 != errc {
+		return
+	}
+
+	t.inspath(newpath)
 
 	return
 }
@@ -241,6 +264,8 @@ func (t *testrun) randaction(pctact int) (errc int) {
 	case action < pctact*2:
 		errc = t.move(path)
 	case action < pctact*3:
+		errc = t.link(path)
+	case action < pctact*4:
 		stat := fuse.Stat_t{}
 		errc = t.fs.Getattr(path, &stat, ^uint64(0))
 		if 0 == errc {
@@ -248,9 +273,9 @@ func (t *testrun) randaction(pctact int) (errc int) {
 				errc = t.populate(path, maxcnt, pctdir)
 			}
 		}
-	case action < pctact*4:
-		errc = t.fs.Chmod(path, 0742)
 	case action < pctact*5:
+		errc = t.fs.Chmod(path, 0742)
+	case action < pctact*6:
 		fh := uint64(0)
 		errc, fh = t.fs.Open(path, fuse.O_RDWR)
 		if -fuse.EISDIR == errc {

@@ -587,7 +587,7 @@ func (fs *Unionfs) rmnode(path string, isdir bool, fn func(v uint8) int) (errc i
 	return
 }
 
-func (fs *Unionfs) rename(oldpath string, newpath string, fn func(v uint8) int) (errc int) {
+func (fs *Unionfs) renode(oldpath string, newpath string, link bool, fn func(v uint8) int) (errc int) {
 	if hasPathPrefix(oldpath, fs.pmpath) || hasPathPrefix(newpath, fs.pmpath) {
 		return -fuse.EPERM
 	}
@@ -605,7 +605,13 @@ func (fs *Unionfs) rename(oldpath string, newpath string, fn func(v uint8) int) 
 	default:
 		switch newv {
 		case union.NOTEXIST, union.WHITEOUT:
+			if link && fuse.S_IFDIR == olds.Mode&fuse.S_IFMT {
+				return -fuse.EPERM
+			}
 		default:
+			if link {
+				return -fuse.EEXIST
+			}
 			if fuse.S_IFDIR == olds.Mode&fuse.S_IFMT {
 				if fuse.S_IFDIR == news.Mode&fuse.S_IFMT {
 					if fs.notempty(newpath, newisopq, newv) {
@@ -632,10 +638,12 @@ func (fs *Unionfs) rename(oldpath string, newpath string, fn func(v uint8) int) 
 
 		errc = fn(0)
 		if 0 == errc {
-			for _, path := range paths {
-				fs.setvis(path, union.NOTEXIST)
+			if !link {
+				for _, path := range paths {
+					fs.setvis(path, union.NOTEXIST)
+				}
+				fs.setvis(oldpath, union.WHITEOUT)
 			}
-			fs.setvis(oldpath, union.WHITEOUT)
 			fs.setvis(newpath, 0)
 		}
 	}
@@ -848,22 +856,7 @@ func (fs *Unionfs) Rmdir(path string) (errc int) {
 }
 
 func (fs *Unionfs) Link(oldpath string, newpath string) (errc int) {
-	if hasPathPrefix(oldpath, fs.pmpath) {
-		return -fuse.EPERM
-	}
-
-	return fs.mknode(newpath, false, func(v uint8) int {
-		var s fuse.Stat_t
-		_, _, oldv := fs.getvis(oldpath, &s)
-		switch oldv {
-		case union.NOTEXIST, union.WHITEOUT:
-		case 0:
-		default:
-			e := fs.cpany(oldpath, oldv, &s)
-			if 0 != e {
-				return e
-			}
-		}
+	return fs.renode(oldpath, newpath, true, func(v uint8) int {
 		return fs.fslist[v].Link(oldpath, newpath)
 	})
 }
@@ -883,7 +876,7 @@ func (fs *Unionfs) Readlink(path string) (errc int, target string) {
 }
 
 func (fs *Unionfs) Rename(oldpath string, newpath string) (errc int) {
-	return fs.rename(oldpath, newpath, func(v uint8) int {
+	return fs.renode(oldpath, newpath, false, func(v uint8) int {
 		return fs.fslist[v].Rename(oldpath, newpath)
 	})
 }
