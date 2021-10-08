@@ -81,7 +81,7 @@ import (
 	"github.com/billziss-gh/cgofuse/fuse"
 )
 
-const Pathmapdbg = true
+const Pathmapdbg = false
 
 type Pathmap struct {
 	Caseins bool
