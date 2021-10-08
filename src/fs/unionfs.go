@@ -572,8 +572,8 @@ func (fs *Unionfs) rename(oldpath string, newpath string, fn func(v uint8) int) 
 	fs.nsmux.Lock()
 	defer fs.nsmux.Unlock()
 
-	var news fuse.Stat_t
-	_, oldisopq, oldv := fs.getvis(oldpath, nil)
+	var olds, news fuse.Stat_t
+	_, oldisopq, oldv := fs.getvis(oldpath, &olds)
 	_, newisopq, newv := fs.getvis(newpath, &news)
 
 	switch oldv {
@@ -583,8 +583,18 @@ func (fs *Unionfs) rename(oldpath string, newpath string, fn func(v uint8) int) 
 		switch newv {
 		case union.NOTEXIST, union.WHITEOUT:
 		default:
-			if fuse.S_IFDIR == news.Mode&fuse.S_IFMT && fs.notempty(newpath, newisopq, newv) {
-				return -fuse.ENOTEMPTY
+			if fuse.S_IFDIR == olds.Mode&fuse.S_IFMT {
+				if fuse.S_IFDIR == news.Mode&fuse.S_IFMT {
+					if fs.notempty(newpath, newisopq, newv) {
+						return -fuse.ENOTEMPTY
+					}
+				} else {
+					return -fuse.ENOTDIR
+				}
+			} else {
+				if fuse.S_IFDIR == news.Mode&fuse.S_IFMT {
+					return -fuse.EISDIR
+				}
 			}
 		}
 

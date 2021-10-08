@@ -16,13 +16,17 @@ package fs
 import (
 	"errors"
 	"fmt"
+	"log"
 	"math/rand"
+	"os"
 	pathutil "path"
+	"runtime"
 	"sort"
 	"testing"
 	"time"
 
 	"github.com/billziss-gh/cgofuse/fuse"
+	"github.com/billziss-gh/golib/terminal"
 	"github.com/billziss-gh/golib/trace"
 )
 
@@ -140,9 +144,35 @@ func (t *testrun) rmtree(path string) (errc int) {
 	})
 }
 
-func (t *testrun) rename(path string) (errc int) {
-	newpath := pathutil.Join(pathutil.Dir(path), t.randname())
+func (t *testrun) rename(path string, newpath string) (errc int) {
 	defer trace.Trace(0, t.prefix, path, newpath)(&errc)
+	errc = t.fs.Rename(path, newpath)
+	return
+}
+
+func (t *testrun) move(path string) (errc int) {
+	pdir := pathutil.Dir(path)
+	newpath := ""
+
+	errc, fh := t.fs.Opendir(pdir)
+	if 0 == errc {
+		names := []string{}
+		t.fs.Readdir(pdir, func(name string, stat *fuse.Stat_t, ofst int64) bool {
+			if "." == name || ".." == name || ".unionfs" == name {
+				return true
+			}
+			names = append(names, name)
+			return true
+		}, 0, fh)
+		sort.Strings(names)
+		t.fs.Releasedir(pdir, fh)
+		if 0 < len(names) {
+			newpath = pathutil.Join(pdir, names[t.r.Int()%len(names)])
+		}
+	}
+	if "" == newpath || path == newpath {
+		newpath = pathutil.Join(pdir, t.randname())
+	}
 
 	files := []*testFile{}
 	defer func() {
@@ -162,11 +192,20 @@ func (t *testrun) rename(path string) (errc int) {
 		files = append(files, file)
 	}
 
-	errc = t.fs.Rename(path, newpath)
+	errc = t.rename(path, newpath)
+	switch errc {
+	case -fuse.EISDIR, -fuse.ENOTDIR, -fuse.ENOTEMPTY:
+		// retry renaming to a random name
+		newpath = pathutil.Join(pdir, t.randname())
+		errc = t.rename(path, newpath)
+	}
 	if 0 != errc {
 		return
 	}
 
+	if i := sort.SearchStrings(t.paths, newpath); len(t.paths) > i && t.paths[i] == newpath {
+		t.paths = append(t.paths[:i], t.paths[i+1:]...)
+	}
 	for i := sort.SearchStrings(t.paths, path); len(t.paths) > i && hasPathPrefix(t.paths[i], path); i++ {
 		t.paths[i] = newpath + t.paths[i][len(path):]
 	}
@@ -204,7 +243,7 @@ func (t *testrun) randaction(pctact int) (errc int) {
 			errc = t.mkdir(path, 0777)
 		}
 	case action < pctact*2:
-		errc = t.rename(path)
+		errc = t.move(path)
 	case action < pctact*3:
 		stat := fuse.Stat_t{}
 		errc = t.fs.Getattr(path, &stat, ^uint64(0))
@@ -276,7 +315,7 @@ func enumerate(fs fuse.FileSystemInterface, path string, pre bool, fn func(path 
 	errc, fh := fs.Opendir(path)
 	if 0 == errc {
 		fs.Readdir(path, func(name string, stat *fuse.Stat_t, ofst int64) bool {
-			if "." == name || ".." == name {
+			if "." == name || ".." == name || ".unionfs" == name {
 				return true
 			}
 			names = append(names, name)
@@ -456,8 +495,15 @@ func testCloseFile(fs fuse.FileSystemInterface, file *testFile) (errc int) {
 }
 
 func TestUnionfs(t *testing.T) {
-	//trace.Pattern = "github.com/billziss-gh/hubfs/fs.*"
-	//trace.Verbose = true
+	w := terminal.Stderr
+	if _, file, _, ok := runtime.Caller(0); ok {
+		if f, e := os.Create(pathutil.Join(pathutil.Dir(file), "log.txt")); nil == e {
+			w = terminal.NewEscapeWriter(f, "{{ }}", terminal.NullEscapeCode)
+		}
+	}
+	trace.Logger = log.New(w, "", log.LstdFlags)
+	trace.Pattern = "github.com/billziss-gh/hubfs/fs.*"
+	trace.Verbose = true
 
 	seed := time.Now().UnixNano()
 	fmt.Println("seed =", seed)
