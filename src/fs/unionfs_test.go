@@ -16,17 +16,13 @@ package fs
 import (
 	"errors"
 	"fmt"
-	"log"
 	"math/rand"
-	"os"
 	pathutil "path"
-	"runtime"
 	"sort"
 	"testing"
 	"time"
 
 	"github.com/billziss-gh/cgofuse/fuse"
-	"github.com/billziss-gh/golib/terminal"
 	"github.com/billziss-gh/golib/trace"
 )
 
@@ -158,7 +154,7 @@ func (t *testrun) move(path string) (errc int) {
 	if 0 == errc {
 		names := []string{}
 		t.fs.Readdir(pdir, func(name string, stat *fuse.Stat_t, ofst int64) bool {
-			if "." == name || ".." == name || ".unionfs" == name {
+			if "." == name || ".." == name {
 				return true
 			}
 			names = append(names, name)
@@ -315,7 +311,7 @@ func enumerate(fs fuse.FileSystemInterface, path string, pre bool, fn func(path 
 	errc, fh := fs.Opendir(path)
 	if 0 == errc {
 		fs.Readdir(path, func(name string, stat *fuse.Stat_t, ofst int64) bool {
-			if "." == name || ".." == name || ".unionfs" == name {
+			if "." == name || ".." == name {
 				return true
 			}
 			names = append(names, name)
@@ -379,9 +375,6 @@ func readstring(fs fuse.FileSystemInterface, path string) (errc int, data string
 func compare(fs1, fs2 fuse.FileSystemInterface) (err error) {
 	paths1 := []string{}
 	enumerate(fs1, "/", true, func(path string) int {
-		if "/.unionfs" == path {
-			return 0
-		}
 		paths1 = append(paths1, path)
 		return 0
 	})
@@ -389,9 +382,6 @@ func compare(fs1, fs2 fuse.FileSystemInterface) (err error) {
 
 	paths2 := []string{}
 	enumerate(fs2, "/", true, func(path string) int {
-		if "/.unionfs" == path {
-			return 0
-		}
 		paths2 = append(paths2, path)
 		return 0
 	})
@@ -435,11 +425,6 @@ func compare(fs1, fs2 fuse.FileSystemInterface) (err error) {
 	}
 
 	return nil
-}
-
-func hasPathPrefix(path, prefix string) bool {
-	return path == prefix ||
-		(len(path) >= len(prefix) && path[:len(prefix)] == prefix && path[len(prefix)] == '/')
 }
 
 type testFile struct {
@@ -495,15 +480,15 @@ func testCloseFile(fs fuse.FileSystemInterface, file *testFile) (errc int) {
 }
 
 func TestUnionfs(t *testing.T) {
-	w := terminal.Stderr
-	if _, file, _, ok := runtime.Caller(0); ok {
-		if f, e := os.Create(pathutil.Join(pathutil.Dir(file), "log.txt")); nil == e {
-			w = terminal.NewEscapeWriter(f, "{{ }}", terminal.NullEscapeCode)
-		}
-	}
-	trace.Logger = log.New(w, "", log.LstdFlags)
-	trace.Pattern = "github.com/billziss-gh/hubfs/fs.*"
-	trace.Verbose = true
+	// w := terminal.Stderr
+	// if _, file, _, ok := runtime.Caller(0); ok {
+	// 	if f, e := os.Create(pathutil.Join(pathutil.Dir(file), "log.txt")); nil == e {
+	// 		w = terminal.NewEscapeWriter(f, "{{ }}", terminal.NullEscapeCode)
+	// 	}
+	// }
+	// trace.Logger = log.New(w, "", log.LstdFlags)
+	// trace.Pattern = "github.com/billziss-gh/hubfs/fs.*"
+	// trace.Verbose = true
 
 	seed := time.Now().UnixNano()
 	fmt.Println("seed =", seed)
@@ -511,7 +496,7 @@ func TestUnionfs(t *testing.T) {
 	cfs := NewTestfs()
 	fs1 := NewTestfs()
 	fs2 := NewTestfs()
-	ufs := NewUnionfs([]fuse.FileSystemInterface{fs1, fs2}, false)
+	ufs := NewUnionfs([]fuse.FileSystemInterface{fs1, fs2}, "", false)
 	ufs.Init()
 
 	var errc int

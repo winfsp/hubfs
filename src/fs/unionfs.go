@@ -24,6 +24,7 @@ import (
 
 type Unionfs struct {
 	fslist  []fuse.FileSystemInterface // file system list
+	pmpath  string                     // path map file path
 	nsmux   sync.RWMutex               // namespace mutex
 	pathmux sync.Mutex                 // path map mutex
 	pathmap *union.Pathmap             // path map
@@ -42,14 +43,19 @@ type file struct {
 	flags int
 }
 
-func NewUnionfs(fslist []fuse.FileSystemInterface, caseins bool) *Unionfs {
+func NewUnionfs(fslist []fuse.FileSystemInterface, pmpath string, caseins bool) *Unionfs {
 	if 0 == len(fslist) {
 		fslist = []fuse.FileSystemInterface{&fuse.FileSystemBase{}}
 	}
 
 	fs := &Unionfs{}
 	fs.fslist = append(fs.fslist, fslist...)
-	_, fs.pathmap = union.OpenPathmap(fs.fslist[0], "/.unionfs", caseins)
+	if "" != pmpath {
+		fs.pmpath = pmpath
+	} else {
+		fs.pmpath = "/.unionfs"
+	}
+	_, fs.pathmap = union.OpenPathmap(fs.fslist[0], fs.pmpath, caseins)
 	if nil == fs.pathmap {
 		return nil
 	}
@@ -133,6 +139,11 @@ func (fs *Unionfs) lsdir(path string,
 	isopq bool, v uint8, fh uint64,
 	fill func(name string, stat *fuse.Stat_t, ofst int64) bool) {
 
+	pmname := ""
+	if "/" == path {
+		pmname = pathutil.Base(fs.pmpath)
+	}
+
 	type dirent struct {
 		stat *fuse.Stat_t
 		v    uint8
@@ -170,7 +181,7 @@ func (fs *Unionfs) lsdir(path string,
 	names := make([]string, 0, len(dirmap))
 	fs.pathmux.Lock()
 	for name := range dirmap {
-		if "." == name || ".." == name {
+		if "." == name || ".." == name || pmname == name {
 			continue
 		}
 		_, v = fs.pathmap.Get(pathutil.Join(path, name))
@@ -503,6 +514,10 @@ func (fs *Unionfs) cptree(path string, v uint8, stat *fuse.Stat_t, paths *[]stri
 }
 
 func (fs *Unionfs) mknode(path string, isdir bool, fn func(v uint8) int) (errc int) {
+	if hasPathPrefix(path, fs.pmpath) {
+		return -fuse.EPERM
+	}
+
 	fs.nsmux.Lock()
 	defer fs.nsmux.Unlock()
 
@@ -531,6 +546,10 @@ func (fs *Unionfs) mknode(path string, isdir bool, fn func(v uint8) int) (errc i
 }
 
 func (fs *Unionfs) rmnode(path string, isdir bool, fn func(v uint8) int) (errc int) {
+	if hasPathPrefix(path, fs.pmpath) {
+		return -fuse.EPERM
+	}
+
 	fs.nsmux.Lock()
 	defer fs.nsmux.Unlock()
 
@@ -569,6 +588,10 @@ func (fs *Unionfs) rmnode(path string, isdir bool, fn func(v uint8) int) (errc i
 }
 
 func (fs *Unionfs) rename(oldpath string, newpath string, fn func(v uint8) int) (errc int) {
+	if hasPathPrefix(oldpath, fs.pmpath) || hasPathPrefix(newpath, fs.pmpath) {
+		return -fuse.EPERM
+	}
+
 	fs.nsmux.Lock()
 	defer fs.nsmux.Unlock()
 
@@ -621,6 +644,10 @@ func (fs *Unionfs) rename(oldpath string, newpath string, fn func(v uint8) int) 
 }
 
 func (fs *Unionfs) getnode(path string, fn func(isopq bool, v uint8) int) (errc int) {
+	if hasPathPrefix(path, fs.pmpath) {
+		return -fuse.EPERM
+	}
+
 	fs.nsmux.RLock()
 	defer fs.nsmux.RUnlock()
 
@@ -637,6 +664,10 @@ func (fs *Unionfs) getnode(path string, fn func(isopq bool, v uint8) int) (errc 
 }
 
 func (fs *Unionfs) setnode(path string, fn func(v uint8) int) (errc int) {
+	if hasPathPrefix(path, fs.pmpath) {
+		return -fuse.EPERM
+	}
+
 	fs.nsmux.Lock()
 	defer fs.nsmux.Unlock()
 
@@ -817,6 +848,10 @@ func (fs *Unionfs) Rmdir(path string) (errc int) {
 }
 
 func (fs *Unionfs) Link(oldpath string, newpath string) (errc int) {
+	if hasPathPrefix(oldpath, fs.pmpath) {
+		return -fuse.EPERM
+	}
+
 	return fs.mknode(newpath, false, func(v uint8) int {
 		var s fuse.Stat_t
 		_, _, oldv := fs.getvis(oldpath, &s)
@@ -901,6 +936,10 @@ func (fs *Unionfs) Open(path string, flags int) (errc int, fh uint64) {
 
 func (fs *Unionfs) Getattr(path string, stat *fuse.Stat_t, fh uint64) (errc int) {
 	if ^uint64(0) == fh {
+		if hasPathPrefix(path, fs.pmpath) {
+			return -fuse.EPERM
+		}
+
 		fs.nsmux.RLock()
 		defer fs.nsmux.RUnlock()
 
@@ -1092,6 +1131,11 @@ func (fs *Unionfs) Setchgtime(path string, tmsp fuse.Timespec) (errc int) {
 	return fs.setnode(path, func(v uint8) int {
 		return intf.Setchgtime(path, tmsp)
 	})
+}
+
+func hasPathPrefix(path, prefix string) bool {
+	return path == prefix ||
+		(len(path) > len(prefix) && path[:len(prefix)] == prefix && path[len(prefix)] == '/')
 }
 
 var _ fuse.FileSystemInterface = (*Unionfs)(nil)
