@@ -20,8 +20,9 @@ import (
 	"strings"
 
 	"github.com/billziss-gh/cgofuse/fuse"
-	"github.com/billziss-gh/hubfs/fs"
 	"github.com/billziss-gh/hubfs/fs/port"
+	"github.com/billziss-gh/hubfs/fs/ptfs"
+	"github.com/billziss-gh/hubfs/fs/unionfs"
 )
 
 func main() {
@@ -51,16 +52,16 @@ func main() {
 		if nil != err {
 			panic(err)
 		}
-		fslist = append(fslist, fs.NewPtfs(r))
+		fslist = append(fslist, ptfs.NewPtfs(r))
 
 	}
 
 	caseins := false
-	if "windows" == runtime.GOOS {
+	if "windows" == runtime.GOOS || "darwin" == runtime.GOOS {
 		caseins = true
 	}
 
-	unfs := fs.NewUnionfs(fslist, caseins)
+	unfs := unionfs.NewUnionfs(fslist, "", caseins)
 	host := fuse.NewFileSystemHost(unfs)
 	if caseins {
 		host.SetCapCaseInsensitive(caseins)

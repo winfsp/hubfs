@@ -19,8 +19,8 @@ import (
 	"runtime"
 
 	"github.com/billziss-gh/cgofuse/fuse"
-	"github.com/billziss-gh/hubfs/fs"
 	"github.com/billziss-gh/hubfs/fs/port"
+	"github.com/billziss-gh/hubfs/fs/ptfs"
 )
 
 func main() {
@@ -37,7 +37,7 @@ func main() {
 		root = "."
 	}
 
-	ptfs := fs.NewPtfs(root)
+	ptfs := ptfs.NewPtfs(root)
 	host := fuse.NewFileSystemHost(ptfs)
 	if "windows" == runtime.GOOS {
 		host.SetCapCaseInsensitive(true)
