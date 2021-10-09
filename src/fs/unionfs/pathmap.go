@@ -11,7 +11,7 @@
  * Software Foundation.
  */
 
-package union
+package unionfs
 
 // PATH MAP FILE FORMAT
 //

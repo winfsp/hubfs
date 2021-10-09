@@ -11,7 +11,7 @@
  * Software Foundation.
  */
 
-package union
+package unionfs
 
 import (
 	"crypto/sha256"

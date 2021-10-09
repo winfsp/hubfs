@@ -11,7 +11,7 @@
  * Software Foundation.
  */
 
-package union
+package unionfs
 
 type Filer interface {
 	CopyFile(path string, file interface{}) bool

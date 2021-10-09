@@ -19,7 +19,6 @@ import (
 	"sync"
 
 	"github.com/billziss-gh/cgofuse/fuse"
-	"github.com/billziss-gh/hubfs/fs/union"
 )
 
 type Unionfs struct {
@@ -27,9 +26,9 @@ type Unionfs struct {
 	pmpath  string                     // path map file path
 	nsmux   sync.RWMutex               // namespace mutex
 	pathmux sync.Mutex                 // path map mutex
-	pathmap *union.Pathmap             // path map
+	pathmap *Pathmap                   // path map
 	filemux sync.Mutex                 // open file mutex
-	filemap *union.Filemap             // open file map
+	filemap *Filemap                   // open file map
 
 	// lock hierarchy:
 	//     nsmux -> pathmux
@@ -54,11 +53,11 @@ func NewUnionfs(fslist []fuse.FileSystemInterface, pmname string, caseins bool) 
 	fs := &Unionfs{}
 	fs.fslist = append(fs.fslist, fslist...)
 	fs.pmpath = pathutil.Join("/", pmname)
-	_, fs.pathmap = union.OpenPathmap(fs.fslist[0], fs.pmpath, caseins)
+	_, fs.pathmap = OpenPathmap(fs.fslist[0], fs.pmpath, caseins)
 	if nil == fs.pathmap {
 		return nil
 	}
-	fs.filemap = union.NewFilemap(fs, caseins)
+	fs.filemap = NewFilemap(fs, caseins)
 
 	return fs
 }
@@ -68,8 +67,8 @@ func (fs *Unionfs) getvis(path string, stat *fuse.Stat_t) (errc int, isopq bool,
 	isopq, v = fs.pathmap.Get(path)
 	fs.pathmux.Unlock()
 
-	if union.UNKNOWN == v {
-		u := union.NOTEXIST
+	if UNKNOWN == v {
+		u := NOTEXIST
 		var s fuse.Stat_t
 		for i, fs := range fs.fslist {
 			e := fs.Getattr(path, &s, ^uint64(0))
@@ -84,11 +83,11 @@ func (fs *Unionfs) getvis(path string, stat *fuse.Stat_t) (errc int, isopq bool,
 
 		fs.pathmux.Lock()
 		isopq, v = fs.pathmap.Get(path)
-		if union.UNKNOWN == v {
+		if UNKNOWN == v {
 			fs.pathmap.Set(path, u)
 			fs.pathmux.Unlock()
-			if union.NOTEXIST == u {
-				return -fuse.ENOENT, isopq, union.NOTEXIST
+			if NOTEXIST == u {
+				return -fuse.ENOENT, isopq, NOTEXIST
 			}
 			if nil != stat {
 				*stat = s
@@ -99,13 +98,13 @@ func (fs *Unionfs) getvis(path string, stat *fuse.Stat_t) (errc int, isopq bool,
 	}
 
 	switch v {
-	case union.NOTEXIST, union.WHITEOUT:
+	case NOTEXIST, WHITEOUT:
 		errc = -fuse.ENOENT
 	default:
 		if nil != stat {
 			errc = fs.fslist[v].Getattr(path, stat, ^uint64(0))
 			if 0 != errc {
-				v = union.NOTEXIST
+				v = NOTEXIST
 			}
 		} else {
 			errc = 0
@@ -184,7 +183,7 @@ func (fs *Unionfs) lsdir(path string,
 			continue
 		}
 		_, v = fs.pathmap.Get(pathutil.Join(path, name))
-		if union.WHITEOUT == v {
+		if WHITEOUT == v {
 			continue
 		}
 		names = append(names, name)
@@ -248,7 +247,7 @@ func (fs *Unionfs) mkpdir(path string) (errc int) {
 		_, _, v := fs.getvis(path[:i], &s)
 
 		switch v {
-		case union.NOTEXIST, union.WHITEOUT:
+		case NOTEXIST, WHITEOUT:
 			errc = -fuse.ENOENT
 			break
 		default:
@@ -523,7 +522,7 @@ func (fs *Unionfs) mknode(path string, isdir bool, fn func(v uint8) int) (errc i
 	_, _, v := fs.getvis(path, nil)
 
 	switch v {
-	case union.NOTEXIST, union.WHITEOUT:
+	case NOTEXIST, WHITEOUT:
 		errc = fs.mkpdir(path)
 		if 0 != errc {
 			return
@@ -531,8 +530,8 @@ func (fs *Unionfs) mknode(path string, isdir bool, fn func(v uint8) int) (errc i
 
 		errc = fn(0)
 		if 0 == errc {
-			if union.WHITEOUT == v && isdir {
-				fs.setvis(path, union.OPAQUE)
+			if WHITEOUT == v && isdir {
+				fs.setvis(path, OPAQUE)
 			} else {
 				fs.setvis(path, 0)
 			}
@@ -556,7 +555,7 @@ func (fs *Unionfs) rmnode(path string, isdir bool, fn func(v uint8) int) (errc i
 	_, isopq, v := fs.getvis(path, &s)
 
 	switch v {
-	case union.NOTEXIST, union.WHITEOUT:
+	case NOTEXIST, WHITEOUT:
 		errc = -fuse.ENOENT
 	default:
 		if isdir {
@@ -576,10 +575,10 @@ func (fs *Unionfs) rmnode(path string, isdir bool, fn func(v uint8) int) (errc i
 		if 0 == v {
 			errc = fn(0)
 			if 0 == errc {
-				fs.setvis(path, union.WHITEOUT)
+				fs.setvis(path, WHITEOUT)
 			}
 		} else {
-			fs.setvis(path, union.WHITEOUT)
+			fs.setvis(path, WHITEOUT)
 		}
 	}
 
@@ -599,11 +598,11 @@ func (fs *Unionfs) renode(oldpath string, newpath string, link bool, fn func(v u
 	_, newisopq, newv := fs.getvis(newpath, &news)
 
 	switch oldv {
-	case union.NOTEXIST, union.WHITEOUT:
+	case NOTEXIST, WHITEOUT:
 		errc = -fuse.ENOENT
 	default:
 		switch newv {
-		case union.NOTEXIST, union.WHITEOUT:
+		case NOTEXIST, WHITEOUT:
 			if link && fuse.S_IFDIR == olds.Mode&fuse.S_IFMT {
 				return -fuse.EPERM
 			}
@@ -639,9 +638,9 @@ func (fs *Unionfs) renode(oldpath string, newpath string, link bool, fn func(v u
 		if 0 == errc {
 			if !link {
 				for _, path := range paths {
-					fs.setvis(path, union.NOTEXIST)
+					fs.setvis(path, NOTEXIST)
 				}
-				fs.setvis(oldpath, union.WHITEOUT)
+				fs.setvis(oldpath, WHITEOUT)
 			}
 			fs.setvis(newpath, 0)
 		}
@@ -661,7 +660,7 @@ func (fs *Unionfs) getnode(path string, fn func(isopq bool, v uint8) int) (errc 
 	_, isopq, v := fs.getvis(path, nil)
 
 	switch v {
-	case union.NOTEXIST, union.WHITEOUT:
+	case NOTEXIST, WHITEOUT:
 		errc = -fuse.ENOENT
 	default:
 		errc = fn(isopq, v)
@@ -682,7 +681,7 @@ func (fs *Unionfs) setnode(path string, fn func(v uint8) int) (errc int) {
 	_, _, v := fs.getvis(path, &s)
 
 	switch v {
-	case union.NOTEXIST, union.WHITEOUT:
+	case NOTEXIST, WHITEOUT:
 		errc = -fuse.ENOENT
 	case 0:
 		errc = fn(0)
@@ -759,7 +758,7 @@ func (fs *Unionfs) delfile(path string, wrapfh uint64) {
 }
 
 func (fs *Unionfs) getfile(path string, wrapfh uint64) (isopq bool, v uint8, fh uint64) {
-	v = union.UNKNOWN
+	v = UNKNOWN
 	fh = ^uint64(0)
 
 	fs.filemux.Lock()
@@ -773,7 +772,7 @@ func (fs *Unionfs) getfile(path string, wrapfh uint64) (isopq bool, v uint8, fh 
 }
 
 func (fs *Unionfs) getwfile(path string, wrapfh uint64) (v uint8, fh uint64) {
-	v = union.UNKNOWN
+	v = UNKNOWN
 	fh = ^uint64(0)
 
 	fs.filemux.Lock()
@@ -927,7 +926,7 @@ func (fs *Unionfs) Getattr(path string, stat *fuse.Stat_t, fh uint64) (errc int)
 		return errc
 	} else {
 		_, v, fh := fs.getfile(path, fh)
-		if union.UNKNOWN == v {
+		if UNKNOWN == v {
 			return -fuse.EIO
 		}
 
@@ -942,7 +941,7 @@ func (fs *Unionfs) Truncate(path string, size int64, fh uint64) (errc int) {
 		})
 	} else {
 		v, fh := fs.getwfile(path, fh)
-		if union.UNKNOWN == v {
+		if UNKNOWN == v {
 			return -fuse.EIO
 		}
 
@@ -952,7 +951,7 @@ func (fs *Unionfs) Truncate(path string, size int64, fh uint64) (errc int) {
 
 func (fs *Unionfs) Read(path string, buff []byte, ofst int64, fh uint64) (errc int) {
 	_, v, fh := fs.getfile(path, fh)
-	if union.UNKNOWN == v {
+	if UNKNOWN == v {
 		return -fuse.EIO
 	}
 
@@ -961,7 +960,7 @@ func (fs *Unionfs) Read(path string, buff []byte, ofst int64, fh uint64) (errc i
 
 func (fs *Unionfs) Write(path string, buff []byte, ofst int64, fh uint64) (errc int) {
 	v, fh := fs.getwfile(path, fh)
-	if union.UNKNOWN == v {
+	if UNKNOWN == v {
 		return -fuse.EIO
 	}
 
@@ -981,7 +980,7 @@ func (fs *Unionfs) Release(path string, fh uint64) (errc int) {
 	wrapfh := fh
 
 	_, v, fh := fs.getfile("", fh)
-	if union.UNKNOWN == v {
+	if UNKNOWN == v {
 		return -fuse.EIO
 	}
 
@@ -1020,7 +1019,7 @@ func (fs *Unionfs) Readdir(path string,
 	fh uint64) (errc int) {
 
 	isopq, v, fh := fs.getfile(path, fh)
-	if union.UNKNOWN == v {
+	if UNKNOWN == v {
 		return -fuse.EIO
 	}
 
@@ -1032,7 +1031,7 @@ func (fs *Unionfs) Releasedir(path string, fh uint64) (errc int) {
 	wrapfh := fh
 
 	_, v, fh := fs.getfile("", fh)
-	if union.UNKNOWN == v {
+	if UNKNOWN == v {
 		return -fuse.EIO
 	}
 
