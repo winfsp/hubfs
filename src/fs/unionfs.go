@@ -43,18 +43,17 @@ type file struct {
 	flags int
 }
 
-func NewUnionfs(fslist []fuse.FileSystemInterface, pmpath string, caseins bool) *Unionfs {
+func NewUnionfs(fslist []fuse.FileSystemInterface, pmname string, caseins bool) *Unionfs {
 	if 0 == len(fslist) {
 		fslist = []fuse.FileSystemInterface{&fuse.FileSystemBase{}}
+	}
+	if "" == pmname {
+		pmname = ".unionfs"
 	}
 
 	fs := &Unionfs{}
 	fs.fslist = append(fs.fslist, fslist...)
-	if "" != pmpath {
-		fs.pmpath = pmpath
-	} else {
-		fs.pmpath = "/.unionfs"
-	}
+	fs.pmpath = pathutil.Join("/", pmname)
 	_, fs.pathmap = union.OpenPathmap(fs.fslist[0], fs.pmpath, caseins)
 	if nil == fs.pathmap {
 		return nil
