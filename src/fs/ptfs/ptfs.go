@@ -13,7 +13,7 @@
  * Software Foundation.
  */
 
-package fs
+package ptfs
 
 import (
 	"path/filepath"
