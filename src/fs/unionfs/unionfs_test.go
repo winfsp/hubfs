@@ -24,6 +24,7 @@ import (
 
 	"github.com/billziss-gh/cgofuse/fuse"
 	"github.com/billziss-gh/golib/trace"
+	"github.com/billziss-gh/hubfs/fs/memfs"
 )
 
 type testrun struct {
@@ -551,9 +552,9 @@ func TestUnionfs(t *testing.T) {
 	seed := time.Now().UnixNano()
 	fmt.Println("seed =", seed)
 
-	cfs := NewTestfs()
-	fs1 := NewTestfs()
-	fs2 := NewTestfs()
+	cfs := memfs.NewMemfs()
+	fs1 := memfs.NewMemfs()
+	fs2 := memfs.NewMemfs()
 	ufs := NewUnionfs([]fuse.FileSystemInterface{fs1, fs2}, "", false)
 	ufs.Init()
 

@@ -1,7 +1,7 @@
 /*
- * testfs_test.go
+ * memfs.go
  *
- * Copyright 2021 Bill Zissimopoulos
+ * Copyright 2017-2021 Bill Zissimopoulos
  */
 /*
  * This file is part of Hubfs.
@@ -11,7 +11,7 @@
  * Software Foundation.
  */
 
-package unionfs
+package memfs
 
 import (
 	"strings"
@@ -83,7 +83,7 @@ func newNode(dev uint64, ino uint64, mode uint32, uid uint32, gid uint32) *node_
 	return &self
 }
 
-type Testfs struct {
+type Memfs struct {
 	fuse.FileSystemBase
 	lock    sync.Mutex
 	ino     uint64
@@ -91,27 +91,27 @@ type Testfs struct {
 	openmap map[uint64]*node_t
 }
 
-func (self *Testfs) Mknod(path string, mode uint32, dev uint64) (errc int) {
+func (self *Memfs) Mknod(path string, mode uint32, dev uint64) (errc int) {
 	defer self.synchronize()()
 	return self.makeNode(path, mode, dev, nil)
 }
 
-func (self *Testfs) Mkdir(path string, mode uint32) (errc int) {
+func (self *Memfs) Mkdir(path string, mode uint32) (errc int) {
 	defer self.synchronize()()
 	return self.makeNode(path, fuse.S_IFDIR|(mode&07777), 0, nil)
 }
 
-func (self *Testfs) Unlink(path string) (errc int) {
+func (self *Memfs) Unlink(path string) (errc int) {
 	defer self.synchronize()()
 	return self.removeNode(path, false)
 }
 
-func (self *Testfs) Rmdir(path string) (errc int) {
+func (self *Memfs) Rmdir(path string) (errc int) {
 	defer self.synchronize()()
 	return self.removeNode(path, true)
 }
 
-func (self *Testfs) Link(oldpath string, newpath string) (errc int) {
+func (self *Memfs) Link(oldpath string, newpath string) (errc int) {
 	defer self.synchronize()()
 	_, _, oldnode := self.lookupNode(oldpath, nil)
 	if nil == oldnode {
@@ -133,12 +133,12 @@ func (self *Testfs) Link(oldpath string, newpath string) (errc int) {
 	return 0
 }
 
-func (self *Testfs) Symlink(target string, newpath string) (errc int) {
+func (self *Memfs) Symlink(target string, newpath string) (errc int) {
 	defer self.synchronize()()
 	return self.makeNode(newpath, fuse.S_IFLNK|00777, 0, []byte(target))
 }
 
-func (self *Testfs) Readlink(path string) (errc int, target string) {
+func (self *Memfs) Readlink(path string) (errc int, target string) {
 	defer self.synchronize()()
 	_, _, node := self.lookupNode(path, nil)
 	if nil == node {
@@ -150,7 +150,7 @@ func (self *Testfs) Readlink(path string) (errc int, target string) {
 	return 0, string(node.data)
 }
 
-func (self *Testfs) Rename(oldpath string, newpath string) (errc int) {
+func (self *Memfs) Rename(oldpath string, newpath string) (errc int) {
 	defer self.synchronize()()
 	oldprnt, oldname, oldnode := self.lookupNode(oldpath, nil)
 	if nil == oldnode {
@@ -178,7 +178,7 @@ func (self *Testfs) Rename(oldpath string, newpath string) (errc int) {
 	return 0
 }
 
-func (self *Testfs) Chmod(path string, mode uint32) (errc int) {
+func (self *Memfs) Chmod(path string, mode uint32) (errc int) {
 	defer self.synchronize()()
 	_, _, node := self.lookupNode(path, nil)
 	if nil == node {
@@ -189,7 +189,7 @@ func (self *Testfs) Chmod(path string, mode uint32) (errc int) {
 	return 0
 }
 
-func (self *Testfs) Chown(path string, uid uint32, gid uint32) (errc int) {
+func (self *Memfs) Chown(path string, uid uint32, gid uint32) (errc int) {
 	defer self.synchronize()()
 	_, _, node := self.lookupNode(path, nil)
 	if nil == node {
@@ -205,7 +205,7 @@ func (self *Testfs) Chown(path string, uid uint32, gid uint32) (errc int) {
 	return 0
 }
 
-func (self *Testfs) Utimens(path string, tmsp []fuse.Timespec) (errc int) {
+func (self *Memfs) Utimens(path string, tmsp []fuse.Timespec) (errc int) {
 	defer self.synchronize()()
 	_, _, node := self.lookupNode(path, nil)
 	if nil == node {
@@ -222,12 +222,12 @@ func (self *Testfs) Utimens(path string, tmsp []fuse.Timespec) (errc int) {
 	return 0
 }
 
-func (self *Testfs) Open(path string, flags int) (errc int, fh uint64) {
+func (self *Memfs) Open(path string, flags int) (errc int, fh uint64) {
 	defer self.synchronize()()
 	return self.openNode(path, false)
 }
 
-func (self *Testfs) Getattr(path string, stat *fuse.Stat_t, fh uint64) (errc int) {
+func (self *Memfs) Getattr(path string, stat *fuse.Stat_t, fh uint64) (errc int) {
 	defer self.synchronize()()
 	node := self.getNode(path, fh)
 	if nil == node {
@@ -237,7 +237,7 @@ func (self *Testfs) Getattr(path string, stat *fuse.Stat_t, fh uint64) (errc int
 	return 0
 }
 
-func (self *Testfs) Truncate(path string, size int64, fh uint64) (errc int) {
+func (self *Memfs) Truncate(path string, size int64, fh uint64) (errc int) {
 	defer self.synchronize()()
 	node := self.getNode(path, fh)
 	if nil == node {
@@ -251,7 +251,7 @@ func (self *Testfs) Truncate(path string, size int64, fh uint64) (errc int) {
 	return 0
 }
 
-func (self *Testfs) Read(path string, buff []byte, ofst int64, fh uint64) (n int) {
+func (self *Memfs) Read(path string, buff []byte, ofst int64, fh uint64) (n int) {
 	defer self.synchronize()()
 	node := self.getNode(path, fh)
 	if nil == node {
@@ -269,7 +269,7 @@ func (self *Testfs) Read(path string, buff []byte, ofst int64, fh uint64) (n int
 	return
 }
 
-func (self *Testfs) Write(path string, buff []byte, ofst int64, fh uint64) (n int) {
+func (self *Memfs) Write(path string, buff []byte, ofst int64, fh uint64) (n int) {
 	defer self.synchronize()()
 	node := self.getNode(path, fh)
 	if nil == node {
@@ -287,17 +287,17 @@ func (self *Testfs) Write(path string, buff []byte, ofst int64, fh uint64) (n in
 	return
 }
 
-func (self *Testfs) Release(path string, fh uint64) (errc int) {
+func (self *Memfs) Release(path string, fh uint64) (errc int) {
 	defer self.synchronize()()
 	return self.closeNode(fh)
 }
 
-func (self *Testfs) Opendir(path string) (errc int, fh uint64) {
+func (self *Memfs) Opendir(path string) (errc int, fh uint64) {
 	defer self.synchronize()()
 	return self.openNode(path, true)
 }
 
-func (self *Testfs) Readdir(path string,
+func (self *Memfs) Readdir(path string,
 	fill func(name string, stat *fuse.Stat_t, ofst int64) bool,
 	ofst int64,
 	fh uint64) (errc int) {
@@ -313,12 +313,12 @@ func (self *Testfs) Readdir(path string,
 	return 0
 }
 
-func (self *Testfs) Releasedir(path string, fh uint64) (errc int) {
+func (self *Memfs) Releasedir(path string, fh uint64) (errc int) {
 	defer self.synchronize()()
 	return self.closeNode(fh)
 }
 
-func (self *Testfs) Setxattr(path string, name string, value []byte, flags int) (errc int) {
+func (self *Memfs) Setxattr(path string, name string, value []byte, flags int) (errc int) {
 	defer self.synchronize()()
 	_, _, node := self.lookupNode(path, nil)
 	if nil == node {
@@ -345,7 +345,7 @@ func (self *Testfs) Setxattr(path string, name string, value []byte, flags int) 
 	return 0
 }
 
-func (self *Testfs) Getxattr(path string, name string) (errc int, xatr []byte) {
+func (self *Memfs) Getxattr(path string, name string) (errc int, xatr []byte) {
 	defer self.synchronize()()
 	_, _, node := self.lookupNode(path, nil)
 	if nil == node {
@@ -361,7 +361,7 @@ func (self *Testfs) Getxattr(path string, name string) (errc int, xatr []byte) {
 	return 0, xatr
 }
 
-func (self *Testfs) Removexattr(path string, name string) (errc int) {
+func (self *Memfs) Removexattr(path string, name string) (errc int) {
 	defer self.synchronize()()
 	_, _, node := self.lookupNode(path, nil)
 	if nil == node {
@@ -377,7 +377,7 @@ func (self *Testfs) Removexattr(path string, name string) (errc int) {
 	return 0
 }
 
-func (self *Testfs) Listxattr(path string, fill func(name string) bool) (errc int) {
+func (self *Memfs) Listxattr(path string, fill func(name string) bool) (errc int) {
 	defer self.synchronize()()
 	_, _, node := self.lookupNode(path, nil)
 	if nil == node {
@@ -391,7 +391,7 @@ func (self *Testfs) Listxattr(path string, fill func(name string) bool) (errc in
 	return 0
 }
 
-func (self *Testfs) Chflags(path string, flags uint32) (errc int) {
+func (self *Memfs) Chflags(path string, flags uint32) (errc int) {
 	defer self.synchronize()()
 	_, _, node := self.lookupNode(path, nil)
 	if nil == node {
@@ -402,7 +402,7 @@ func (self *Testfs) Chflags(path string, flags uint32) (errc int) {
 	return 0
 }
 
-func (self *Testfs) Setcrtime(path string, tmsp fuse.Timespec) (errc int) {
+func (self *Memfs) Setcrtime(path string, tmsp fuse.Timespec) (errc int) {
 	defer self.synchronize()()
 	_, _, node := self.lookupNode(path, nil)
 	if nil == node {
@@ -413,7 +413,7 @@ func (self *Testfs) Setcrtime(path string, tmsp fuse.Timespec) (errc int) {
 	return 0
 }
 
-func (self *Testfs) Setchgtime(path string, tmsp fuse.Timespec) (errc int) {
+func (self *Memfs) Setchgtime(path string, tmsp fuse.Timespec) (errc int) {
 	defer self.synchronize()()
 	_, _, node := self.lookupNode(path, nil)
 	if nil == node {
@@ -423,7 +423,7 @@ func (self *Testfs) Setchgtime(path string, tmsp fuse.Timespec) (errc int) {
 	return 0
 }
 
-func (self *Testfs) lookupNode(path string, ancestor *node_t) (prnt *node_t, name string, node *node_t) {
+func (self *Memfs) lookupNode(path string, ancestor *node_t) (prnt *node_t, name string, node *node_t) {
 	prnt = self.root
 	name = ""
 	node = self.root
@@ -446,7 +446,7 @@ func (self *Testfs) lookupNode(path string, ancestor *node_t) (prnt *node_t, nam
 	return
 }
 
-func (self *Testfs) makeNode(path string, mode uint32, dev uint64, data []byte) int {
+func (self *Memfs) makeNode(path string, mode uint32, dev uint64, data []byte) int {
 	prnt, name, node := self.lookupNode(path, nil)
 	if nil == prnt {
 		return -fuse.ENOENT
@@ -468,7 +468,7 @@ func (self *Testfs) makeNode(path string, mode uint32, dev uint64, data []byte) 
 	return 0
 }
 
-func (self *Testfs) removeNode(path string, dir bool) int {
+func (self *Memfs) removeNode(path string, dir bool) int {
 	prnt, name, node := self.lookupNode(path, nil)
 	if nil == node {
 		return -fuse.ENOENT
@@ -491,7 +491,7 @@ func (self *Testfs) removeNode(path string, dir bool) int {
 	return 0
 }
 
-func (self *Testfs) openNode(path string, dir bool) (int, uint64) {
+func (self *Memfs) openNode(path string, dir bool) (int, uint64) {
 	_, _, node := self.lookupNode(path, nil)
 	if nil == node {
 		return -fuse.ENOENT, ^uint64(0)
@@ -509,7 +509,7 @@ func (self *Testfs) openNode(path string, dir bool) (int, uint64) {
 	return 0, node.stat.Ino
 }
 
-func (self *Testfs) closeNode(fh uint64) int {
+func (self *Memfs) closeNode(fh uint64) int {
 	node := self.openmap[fh]
 	node.opencnt--
 	if 0 == node.opencnt {
@@ -518,7 +518,7 @@ func (self *Testfs) closeNode(fh uint64) int {
 	return 0
 }
 
-func (self *Testfs) getNode(path string, fh uint64) *node_t {
+func (self *Memfs) getNode(path string, fh uint64) *node_t {
 	if ^uint64(0) == fh {
 		_, _, node := self.lookupNode(path, nil)
 		return node
@@ -527,18 +527,15 @@ func (self *Testfs) getNode(path string, fh uint64) *node_t {
 	}
 }
 
-func (self *Testfs) synchronize() func() {
+func (self *Memfs) synchronize() func() {
 	self.lock.Lock()
 	return func() {
 		self.lock.Unlock()
 	}
 }
 
-func NewTestfs() *Testfs {
-	// work around cgofuse limitation: fuse.Getcontext may segfault if Mount/OptParse is not called
-	fuse.OptParse([]string{}, "")
-
-	self := Testfs{}
+func NewMemfs() *Memfs {
+	self := Memfs{}
 	defer self.synchronize()()
 	self.ino++
 	self.root = newNode(0, self.ino, fuse.S_IFDIR|00777, 0, 0)
@@ -546,6 +543,6 @@ func NewTestfs() *Testfs {
 	return &self
 }
 
-var _ fuse.FileSystemChflags = (*Testfs)(nil)
-var _ fuse.FileSystemSetcrtime = (*Testfs)(nil)
-var _ fuse.FileSystemSetchgtime = (*Testfs)(nil)
+var _ fuse.FileSystemChflags = (*Memfs)(nil)
+var _ fuse.FileSystemSetcrtime = (*Memfs)(nil)
+var _ fuse.FileSystemSetchgtime = (*Memfs)(nil)

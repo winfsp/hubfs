@@ -17,10 +17,12 @@ import (
 	"fmt"
 	"reflect"
 	"testing"
+
+	"github.com/billziss-gh/hubfs/fs/memfs"
 )
 
 func TestPathmapOpenClose(t *testing.T) {
-	fs := NewTestfs()
+	fs := memfs.NewMemfs()
 
 	ec, pm := OpenPathmap(fs, "/.pathmap$", false)
 	if 0 != ec {
@@ -36,7 +38,7 @@ func TestPathmapOpenClose(t *testing.T) {
 }
 
 func TestPathmapGetSet(t *testing.T) {
-	fs := NewTestfs()
+	fs := memfs.NewMemfs()
 
 	ec, pm := OpenPathmap(fs, "/.pathmap$", false)
 	if 0 != ec {
@@ -119,7 +121,7 @@ func TestPathmapGetSet(t *testing.T) {
 }
 
 func TestPathmapGetSetOpaque(t *testing.T) {
-	fs := NewTestfs()
+	fs := memfs.NewMemfs()
 
 	ec, pm := OpenPathmap(fs, "/.pathmap$", false)
 	if 0 != ec {
@@ -163,7 +165,7 @@ func TestPathmapGetSetOpaque(t *testing.T) {
 }
 
 func TestPathmapSetTree(t *testing.T) {
-	fs := NewTestfs()
+	fs := memfs.NewMemfs()
 
 	ec, pm := OpenPathmap(fs, "/.pathmap$", false)
 	if 0 != ec {
@@ -224,7 +226,7 @@ func TestPathmapSetTree(t *testing.T) {
 }
 
 func TestPathmapWriteIncremental(t *testing.T) {
-	fs := NewTestfs()
+	fs := memfs.NewMemfs()
 
 	ec, pm := OpenPathmap(fs, "/.pathmap$", false)
 	if 0 != ec {
@@ -544,7 +546,7 @@ func TestPathmapWriteIncremental(t *testing.T) {
 }
 
 func TestPathmapWrite(t *testing.T) {
-	fs := NewTestfs()
+	fs := memfs.NewMemfs()
 
 	ec, pm := OpenPathmap(fs, "/.pathmap$", false)
 	if 0 != ec {
@@ -649,7 +651,7 @@ func TestPathmapWrite(t *testing.T) {
 }
 
 func TestPathmapPurge(t *testing.T) {
-	fs := NewTestfs()
+	fs := memfs.NewMemfs()
 
 	ec, pm := OpenPathmap(fs, "/.pathmap$", false)
 	if 0 != ec {
