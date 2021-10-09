@@ -11,7 +11,7 @@
  * Software Foundation.
  */
 
-package fs
+package unionfs
 
 import (
 	"errors"
