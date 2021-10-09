@@ -810,22 +810,10 @@ func (fs *Unionfs) Destroy() {
 func (fs *Unionfs) Statfs(path string, stat *fuse.Statfs_t) (errc int) {
 	errc = -fuse.ENOSYS
 
-	for i, fs := range fs.fslist {
-		if 0 == i {
-			errc = fs.Statfs(path, stat)
-			if 0 != errc {
-				break
-			}
-		} else {
-			s := fuse.Statfs_t{}
-			e := fs.Statfs(path, &s)
-			if 0 == e {
-				if 0 != stat.Frsize {
-					stat.Blocks += s.Frsize * s.Blocks / stat.Frsize
-				}
-				stat.Files += s.Files
-			}
-		}
+	for _, fs := range fs.fslist {
+		// only report stats for first (i.e. writable) file system
+		errc = fs.Statfs(path, stat)
+		break
 	}
 
 	return
