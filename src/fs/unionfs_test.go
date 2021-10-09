@@ -37,6 +37,7 @@ var (
 	testrunCount = 0
 	maxcnt       = 100
 	pctdir       = 20
+	pctsym       = 10
 	pctact       = 10
 )
 
@@ -110,6 +111,19 @@ func (t *testrun) mkfile(path string, mode uint32, buf []uint8) (errc int) {
 	if -fuse.ENOSYS == errc {
 		errc = 0
 	} else if 0 != errc {
+		return
+	}
+
+	t.inspath(path)
+
+	return
+}
+
+func (t *testrun) symlink(path string) (errc int) {
+	defer trace.Trace(0, t.prefix, path)(&errc)
+
+	errc = t.fs.Symlink(path, path)
+	if 0 != errc {
 		return
 	}
 
@@ -233,15 +247,19 @@ func (t *testrun) link(path string) (errc int) {
 	return
 }
 
-func (t *testrun) populate(path string, maxcnt int, pctdir int) (errc int) {
+func (t *testrun) populate(path string, maxcnt int, pctdir int, pctsym int) (errc int) {
 	for i, filecnt := 0, t.r.Int()%maxcnt; filecnt > i; i++ {
 		path := pathutil.Join(path, t.randname())
-		if pctdir > t.r.Int()%100 {
+		action := t.r.Int() % 100
+		switch {
+		case action < pctdir:
 			errc = t.mkdir(path, 0777)
 			if 0 == errc {
-				errc = t.populate(path, maxcnt/2, pctdir/2)
+				errc = t.populate(path, maxcnt/2, pctdir/2, pctsym/2)
 			}
-		} else {
+		case action < pctdir+pctsym:
+			errc = t.symlink(path)
+		default:
 			errc = t.mkfile(path, 0777, []uint8(path))
 		}
 		if 0 != errc {
@@ -268,28 +286,29 @@ func (t *testrun) randaction(pctact int) (errc int) {
 	case action < pctact*4:
 		stat := fuse.Stat_t{}
 		errc = t.fs.Getattr(path, &stat, ^uint64(0))
-		if 0 == errc {
-			if fuse.S_IFDIR == stat.Mode&fuse.S_IFMT {
-				errc = t.populate(path, maxcnt, pctdir)
-			}
+		if 0 == errc && fuse.S_IFDIR == stat.Mode&fuse.S_IFMT {
+			errc = t.populate(path, maxcnt, pctdir, pctsym)
 		}
 	case action < pctact*5:
 		errc = t.fs.Chmod(path, 0742)
 	case action < pctact*6:
-		fh := uint64(0)
-		errc, fh = t.fs.Open(path, fuse.O_RDWR)
-		if -fuse.EISDIR == errc {
-			errc = 0
-		} else if 0 == errc {
-			defer t.fs.Release(path, fh)
-			buf := [4096]uint8{}
-			n := t.fs.Read(path, buf[:], 0, fh)
-			if 0 > n {
-				return n
-			}
-			n = t.fs.Write(path, buf[:n], int64(n), fh)
-			if 0 > n {
-				return n
+		errc, _ = t.fs.Readlink(path)
+		if 0 != errc {
+			fh := uint64(0)
+			errc, fh = t.fs.Open(path, fuse.O_RDWR)
+			if -fuse.EISDIR == errc {
+				errc = 0
+			} else if 0 == errc {
+				defer t.fs.Release(path, fh)
+				buf := [4096]uint8{}
+				n := t.fs.Read(path, buf[:], 0, fh)
+				if 0 > n {
+					return n
+				}
+				n = t.fs.Write(path, buf[:n], int64(n), fh)
+				if 0 > n {
+					return n
+				}
 			}
 		}
 	}
@@ -310,13 +329,13 @@ func (t *testrun) randactions(pctact int) (errc int) {
 
 func (t *testrun) exercise(fs1, fs2, fs3 fuse.FileSystemInterface, maxcnt int, pctdir int, pctact int) (errc int) {
 	t.fs = fs1
-	errc = t.populate("/", maxcnt, pctdir)
+	errc = t.populate("/", maxcnt, pctdir, pctsym)
 	if 0 != errc {
 		return
 	}
 
 	t.fs = fs2
-	errc = t.populate("/", maxcnt, pctdir)
+	errc = t.populate("/", maxcnt, pctdir, pctsym)
 	if 0 != errc {
 		return
 	}
@@ -374,6 +393,11 @@ func enumerate(fs fuse.FileSystemInterface, path string, pre bool, fn func(path 
 }
 
 func readstring(fs fuse.FileSystemInterface, path string) (errc int, data string) {
+	errc, target := fs.Readlink(path)
+	if 0 == errc {
+		return 0, "L:" + target
+	}
+
 	errc, fh := fs.Open(path, fuse.O_RDONLY)
 	if -fuse.EISDIR == errc {
 		errc, fh = fs.Opendir(path)
@@ -460,6 +484,11 @@ type testFile struct {
 }
 
 func testOpenFile(fs fuse.FileSystemInterface, path string) (errc int, file *testFile) {
+	errc, _ = fs.Readlink(path)
+	if 0 == errc {
+		return 0, &testFile{}
+	}
+
 	isdir := false
 	errc, fh := fs.Open(path, fuse.O_RDWR)
 	if -fuse.EISDIR == errc {
@@ -485,6 +514,10 @@ func testOpenFile(fs fuse.FileSystemInterface, path string) (errc int, file *tes
 }
 
 func testCloseFile(fs fuse.FileSystemInterface, file *testFile) (errc int) {
+	if "" == file.path {
+		return
+	}
+
 	if !file.isdir {
 		buf := [4096]uint8{}
 		n := fs.Read(file.path, buf[:], 0, file.fh)
