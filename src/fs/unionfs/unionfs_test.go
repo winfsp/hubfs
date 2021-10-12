@@ -251,6 +251,15 @@ func (t *testrun) link(path string) (errc int) {
 func (t *testrun) populate(path string, maxcnt int, pctdir int, pctsym int) (errc int) {
 	for i, filecnt := 0, t.r.Int()%maxcnt; filecnt > i; i++ {
 		path := pathutil.Join(path, t.randname())
+
+		if 30 > t.r.Int()%100 {
+			stat := fuse.Stat_t{}
+			errc = t.fs.Getattr(path, &stat, ^uint64(0))
+			if -fuse.ENOENT != errc {
+				return -fuse.EIO
+			}
+		}
+
 		action := t.r.Int() % 100
 		switch {
 		case action < pctdir:
