@@ -100,24 +100,6 @@ func TestPathmapGetSet(t *testing.T) {
 	if false != isopq || NOTEXIST != v {
 		t.Error()
 	}
-
-	pm.Set("/a/bb/ccc", 42)
-	isopq, v = pm.Get("/a")
-	if false != isopq || UNKNOWN != v {
-		t.Error()
-	}
-	isopq, v = pm.Get("/a/bb")
-	if false != isopq || UNKNOWN != v {
-		t.Error()
-	}
-	isopq, v = pm.Get("/a/bb/ccc")
-	if false != isopq || 42 != v {
-		t.Error()
-	}
-
-	if e := pm.SanityCheck(); nil != e {
-		t.Error(e)
-	}
 }
 
 func TestPathmapGetSetOpaque(t *testing.T) {
@@ -158,71 +140,6 @@ func TestPathmapGetSetOpaque(t *testing.T) {
 	if true != isopq || 42 != v {
 		t.Error()
 	}
-
-	if e := pm.SanityCheck(); nil != e {
-		t.Error(e)
-	}
-}
-
-func TestPathmapSetTree(t *testing.T) {
-	fs := memfs.NewMemfs()
-
-	ec, pm := OpenPathmap(fs, "/.pathmap$", false)
-	if 0 != ec {
-		t.Error()
-	}
-	defer pm.Close()
-
-	isopq, v := false, UNKNOWN
-
-	pm.Set("/a/bb/ccc", 42)
-	pm.Set("/a/b/c", 43)
-	isopq, v = pm.Get("/a")
-	if false != isopq || UNKNOWN != v {
-		t.Error()
-	}
-	isopq, v = pm.Get("/a/bb")
-	if false != isopq || UNKNOWN != v {
-		t.Error()
-	}
-	isopq, v = pm.Get("/a/bb/ccc")
-	if false != isopq || 42 != v {
-		t.Error()
-	}
-	isopq, v = pm.Get("/a/b")
-	if false != isopq || UNKNOWN != v {
-		t.Error()
-	}
-	isopq, v = pm.Get("/a/b/c")
-	if false != isopq || 43 != v {
-		t.Error()
-	}
-
-	pm.SetTree("/a", WHITEOUT, NOTEXIST)
-	isopq, v = pm.Get("/a")
-	if false != isopq || WHITEOUT != v {
-		t.Error()
-	}
-	isopq, v = pm.Get("/a/bb")
-	if false != isopq || NOTEXIST != v {
-		t.Error()
-	}
-	isopq, v = pm.Get("/a/bb/ccc")
-	if false != isopq || NOTEXIST != v {
-		t.Error()
-	}
-	isopq, v = pm.Get("/a/b")
-	if false != isopq || NOTEXIST != v {
-		t.Error()
-	}
-	isopq, v = pm.Get("/a/b/c")
-	if false != isopq || NOTEXIST != v {
-		t.Error()
-	}
-
-	if e := pm.SanityCheck(); nil != e {
-		t.Error(e)
-	}
 }
 
 func TestPathmapWriteIncremental(t *testing.T) {
@@ -255,10 +172,6 @@ func TestPathmapWriteIncremental(t *testing.T) {
 		t.Error()
 	}
 
-	if e := pm.SanityCheck(); nil != e {
-		t.Error(e)
-	}
-
 	ec, pm2 := OpenPathmap(fs, "/.pathmap$", false)
 	if 0 != ec {
 		t.Error()
@@ -275,18 +188,11 @@ func TestPathmapWriteIncremental(t *testing.T) {
 	if false != isopq || UNKNOWN != v {
 		t.Error()
 	}
-	if e := pm2.SanityCheck(); nil != e {
-		t.Error(e)
-	}
 	pm2.Close()
 
 	n = pm.Write()
 	if 0 > n {
 		t.Error()
-	}
-
-	if e := pm.SanityCheck(); nil != e {
-		t.Error(e)
 	}
 
 	ec, pm2 = OpenPathmap(fs, "/.pathmap$", false)
@@ -304,9 +210,6 @@ func TestPathmapWriteIncremental(t *testing.T) {
 	isopq, v = pm2.Get("/a/bb/ccc")
 	if false != isopq || UNKNOWN != v {
 		t.Error()
-	}
-	if e := pm2.SanityCheck(); nil != e {
-		t.Error(e)
 	}
 	pm2.Close()
 
@@ -337,10 +240,6 @@ func TestPathmapWriteIncremental(t *testing.T) {
 		t.Error()
 	}
 
-	if e := pm.SanityCheck(); nil != e {
-		t.Error(e)
-	}
-
 	ec, pm2 = OpenPathmap(fs, "/.pathmap$", false)
 	if 0 != ec {
 		t.Error()
@@ -356,9 +255,6 @@ func TestPathmapWriteIncremental(t *testing.T) {
 	isopq, v = pm2.Get("/a/b")
 	if false != isopq || UNKNOWN != v {
 		t.Error()
-	}
-	if e := pm2.SanityCheck(); nil != e {
-		t.Error(e)
 	}
 	pm2.Close()
 
@@ -390,10 +286,6 @@ func TestPathmapWriteIncremental(t *testing.T) {
 		t.Error()
 	}
 
-	if e := pm.SanityCheck(); nil != e {
-		t.Error(e)
-	}
-
 	ec, pm2 = OpenPathmap(fs, "/.pathmap$", false)
 	if 0 != ec {
 		t.Error()
@@ -417,130 +309,6 @@ func TestPathmapWriteIncremental(t *testing.T) {
 	isopq, v = pm2.Get("/a/b/c")
 	if false != isopq || WHITEOUT != v {
 		t.Error()
-	}
-	if e := pm2.SanityCheck(); nil != e {
-		t.Error(e)
-	}
-	pm2.Close()
-
-	pm.SetTree("/a", WHITEOUT, NOTEXIST)
-	isopq, v = pm.Get("/a")
-	if false != isopq || WHITEOUT != v {
-		t.Error()
-	}
-	isopq, v = pm.Get("/a/bb")
-	if false != isopq || NOTEXIST != v {
-		t.Error()
-	}
-	isopq, v = pm.Get("/a/bb/ccc")
-	if false != isopq || NOTEXIST != v {
-		t.Error()
-	}
-	isopq, v = pm.Get("/a/b")
-	if false != isopq || NOTEXIST != v {
-		t.Error()
-	}
-	isopq, v = pm.Get("/a/b/c")
-	if false != isopq || NOTEXIST != v {
-		t.Error()
-	}
-
-	n = pm.Write()
-	if 0 > n {
-		t.Error()
-	}
-
-	if e := pm.SanityCheck(); nil != e {
-		t.Error(e)
-	}
-
-	ec, pm2 = OpenPathmap(fs, "/.pathmap$", false)
-	if 0 != ec {
-		t.Error()
-	}
-	isopq, v = pm2.Get("/a")
-	if false != isopq || WHITEOUT != v {
-		t.Error()
-	}
-	isopq, v = pm2.Get("/a/bb")
-	if false != isopq || UNKNOWN != v {
-		t.Error()
-	}
-	isopq, v = pm2.Get("/a/bb/ccc")
-	if false != isopq || UNKNOWN != v {
-		t.Error()
-	}
-	isopq, v = pm2.Get("/a/b")
-	if false != isopq || UNKNOWN != v {
-		t.Error()
-	}
-	isopq, v = pm2.Get("/a/b/c")
-	if false != isopq || UNKNOWN != v {
-		t.Error()
-	}
-	if e := pm2.SanityCheck(); nil != e {
-		t.Error(e)
-	}
-	pm2.Close()
-
-	pm.Set("/a", 10)
-	pm.Set("/a/bb", 11)
-	isopq, v = pm.Get("/a")
-	if false != isopq || 10 != v {
-		t.Error()
-	}
-	isopq, v = pm.Get("/a/bb")
-	if false != isopq || 11 != v {
-		t.Error()
-	}
-	isopq, v = pm.Get("/a/bb/ccc")
-	if false != isopq || NOTEXIST != v {
-		t.Error()
-	}
-	isopq, v = pm.Get("/a/b")
-	if false != isopq || NOTEXIST != v {
-		t.Error()
-	}
-	isopq, v = pm.Get("/a/b/c")
-	if false != isopq || NOTEXIST != v {
-		t.Error()
-	}
-
-	n = pm.Write()
-	if 0 > n {
-		t.Error()
-	}
-
-	if e := pm.SanityCheck(); nil != e {
-		t.Error(e)
-	}
-
-	ec, pm2 = OpenPathmap(fs, "/.pathmap$", false)
-	if 0 != ec {
-		t.Error()
-	}
-	isopq, v = pm2.Get("/a")
-	if false != isopq || UNKNOWN != v {
-		t.Error()
-	}
-	isopq, v = pm2.Get("/a/bb")
-	if false != isopq || UNKNOWN != v {
-		t.Error()
-	}
-	isopq, v = pm2.Get("/a/bb/ccc")
-	if false != isopq || UNKNOWN != v {
-		t.Error()
-	}
-	isopq, v = pm2.Get("/a/b")
-	if false != isopq || UNKNOWN != v {
-		t.Error()
-	}
-	isopq, v = pm2.Get("/a/b/c")
-	if false != isopq || UNKNOWN != v {
-		t.Error()
-	}
-	if e := pm2.SanityCheck(); nil != e {
-		t.Error(e)
 	}
 	pm2.Close()
 }
@@ -578,9 +346,6 @@ func TestPathmapWrite(t *testing.T) {
 			if !reflect.DeepEqual(pm.vm, pm2.vm) {
 				t.Error()
 			}
-			if !reflect.DeepEqual(pm.hm, pm2.hm) {
-				t.Error()
-			}
 			pm2.Close()
 		}
 	}
@@ -604,7 +369,7 @@ func TestPathmapWrite(t *testing.T) {
 			if 0 != ec {
 				t.Error()
 			}
-			if len(pm2.vm) != N-i {
+			if len(pm2.vm) != N-i-1 {
 				t.Error()
 			}
 			pm2.Close()
@@ -630,7 +395,7 @@ func TestPathmapWrite(t *testing.T) {
 			if 0 != ec {
 				t.Error()
 			}
-			if len(pm2.vm) != (i + 2) {
+			if len(pm2.vm) != i+1 {
 				t.Error()
 			}
 			pm2.Close()
@@ -642,9 +407,6 @@ func TestPathmapWrite(t *testing.T) {
 		t.Error()
 	}
 	if !reflect.DeepEqual(pm.vm, pm2.vm) {
-		t.Error()
-	}
-	if !reflect.DeepEqual(pm.hm, pm2.hm) {
 		t.Error()
 	}
 	pm2.Close()
@@ -661,17 +423,18 @@ func TestPathmapPurge(t *testing.T) {
 
 	isopq, v := false, UNKNOWN
 
+	pm.Set("/a/bb", OPAQUE)
 	pm.Set("/a/bb/ccc", 42)
 	isopq, v = pm.Get("/a")
 	if false != isopq || UNKNOWN != v {
 		t.Error()
 	}
 	isopq, v = pm.Get("/a/bb")
-	if false != isopq || UNKNOWN != v {
+	if true != isopq || 0 != v {
 		t.Error()
 	}
 	isopq, v = pm.Get("/a/bb/ccc")
-	if false != isopq || 42 != v {
+	if true != isopq || 42 != v {
 		t.Error()
 	}
 
@@ -687,18 +450,15 @@ func TestPathmapPurge(t *testing.T) {
 		t.Error()
 	}
 	isopq, v = pm.Get("/a/bb")
-	if false != isopq || UNKNOWN != v {
+	if true != isopq || 0 != v {
 		t.Error()
 	}
 	isopq, v = pm.Get("/a/bb/ccc")
-	if false != isopq || UNKNOWN != v {
+	if true != isopq || UNKNOWN != v {
 		t.Error()
 	}
 
-	if 3 != len(pm.vm) {
-		t.Error()
-	}
-	if 3 != len(pm.hm) {
+	if 1 != len(pm.vm) {
 		t.Error()
 	}
 
@@ -707,9 +467,6 @@ func TestPathmapPurge(t *testing.T) {
 		t.Error()
 	}
 	if !reflect.DeepEqual(pm.vm, pm2.vm) {
-		t.Error()
-	}
-	if !reflect.DeepEqual(pm.hm, pm2.hm) {
 		t.Error()
 	}
 	pm2.Close()
