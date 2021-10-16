@@ -17,12 +17,10 @@ import (
 	"fmt"
 	"reflect"
 	"testing"
-
-	"github.com/billziss-gh/hubfs/fs/memfs"
 )
 
 func TestPathmapOpenClose(t *testing.T) {
-	fs := memfs.NewMemfs()
+	fs := newTestfs()
 
 	ec, pm := OpenPathmap(fs, "/.pathmap$", false)
 	if 0 != ec {
@@ -38,7 +36,7 @@ func TestPathmapOpenClose(t *testing.T) {
 }
 
 func TestPathmapGetSet(t *testing.T) {
-	fs := memfs.NewMemfs()
+	fs := newTestfs()
 
 	ec, pm := OpenPathmap(fs, "/.pathmap$", false)
 	if 0 != ec {
@@ -103,7 +101,7 @@ func TestPathmapGetSet(t *testing.T) {
 }
 
 func TestPathmapGetSetOpaque(t *testing.T) {
-	fs := memfs.NewMemfs()
+	fs := newTestfs()
 
 	ec, pm := OpenPathmap(fs, "/.pathmap$", false)
 	if 0 != ec {
@@ -143,7 +141,7 @@ func TestPathmapGetSetOpaque(t *testing.T) {
 }
 
 func TestPathmapWriteIncremental(t *testing.T) {
-	fs := memfs.NewMemfs()
+	fs := newTestfs()
 
 	ec, pm := OpenPathmap(fs, "/.pathmap$", false)
 	if 0 != ec {
@@ -311,10 +309,63 @@ func TestPathmapWriteIncremental(t *testing.T) {
 		t.Error()
 	}
 	pm2.Close()
+
+	pm.Set("/a/b/c", 0)
+	isopq, v = pm.Get("/a")
+	if false != isopq || UNKNOWN != v {
+		t.Error()
+	}
+	isopq, v = pm.Get("/a/bb")
+	if false != isopq || UNKNOWN != v {
+		t.Error()
+	}
+	isopq, v = pm.Get("/a/bb/ccc")
+	if false != isopq || 42 != v {
+		t.Error()
+	}
+	isopq, v = pm.Get("/a/b")
+	if false != isopq || 50 != v {
+		t.Error()
+	}
+	isopq, v = pm.Get("/a/b/c")
+	if false != isopq || 0 != v {
+		t.Error()
+	}
+
+	n = pm.Write()
+	if 0 > n {
+		t.Error()
+	}
+
+	ec, pm2 = OpenPathmap(fs, "/.pathmap$", false)
+	if 0 != ec {
+		t.Error()
+	}
+	isopq, v = pm2.Get("/a")
+	if false != isopq || UNKNOWN != v {
+		t.Error()
+	}
+	isopq, v = pm2.Get("/a/bb")
+	if false != isopq || UNKNOWN != v {
+		t.Error()
+	}
+	isopq, v = pm2.Get("/a/bb/ccc")
+	if false != isopq || UNKNOWN != v {
+		t.Error()
+	}
+	isopq, v = pm2.Get("/a/b")
+	if false != isopq || UNKNOWN != v {
+		t.Error()
+	}
+	isopq, v = pm2.Get("/a/b/c")
+	if false != isopq || UNKNOWN != v {
+		t.Error()
+	}
+	pm2.Close()
 }
 
 func TestPathmapWrite(t *testing.T) {
-	fs := memfs.NewMemfs()
+	fs := newTestfs()
 
 	ec, pm := OpenPathmap(fs, "/.pathmap$", false)
 	if 0 != ec {
@@ -413,7 +464,7 @@ func TestPathmapWrite(t *testing.T) {
 }
 
 func TestPathmapPurge(t *testing.T) {
-	fs := memfs.NewMemfs()
+	fs := newTestfs()
 
 	ec, pm := OpenPathmap(fs, "/.pathmap$", false)
 	if 0 != ec {

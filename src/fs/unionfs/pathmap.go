@@ -206,7 +206,7 @@ func (pm *Pathmap) Set(path string, v uint8) {
 	k := ComputePathkey(path, pm.Caseins)
 	u, ok := pm.vm[k]
 	if !ok {
-		u = _DIRT | UNKNOWN
+		u = UNKNOWN
 	}
 
 	pm.vm[k] = _pathmapNewv(u, v)
