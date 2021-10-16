@@ -107,7 +107,13 @@ func (fs *Overlayfs) Rmdir(path string) (errc int) {
 }
 
 func (fs *Overlayfs) Link(oldpath string, newpath string) (errc int) {
-	return -fuse.ENOSYS
+	oldprefix, _ := fs.split(oldpath)
+	newprefix, newpath := fs.split(oldpath)
+	if oldprefix != newprefix {
+		return -fuse.EXDEV
+	}
+	dstfs, oldpath := fs.destination(oldpath)
+	return dstfs.Link(oldpath, newpath)
 }
 
 func (fs *Overlayfs) Symlink(target string, newpath string) (errc int) {
@@ -121,7 +127,13 @@ func (fs *Overlayfs) Readlink(path string) (errc int, target string) {
 }
 
 func (fs *Overlayfs) Rename(oldpath string, newpath string) (errc int) {
-	return -fuse.ENOSYS
+	oldprefix, _ := fs.split(oldpath)
+	newprefix, newpath := fs.split(oldpath)
+	if oldprefix != newprefix {
+		return -fuse.EXDEV
+	}
+	dstfs, oldpath := fs.destination(oldpath)
+	return dstfs.Rename(oldpath, newpath)
 }
 
 func (fs *Overlayfs) Chmod(path string, mode uint32) (errc int) {
