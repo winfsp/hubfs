@@ -37,7 +37,7 @@ func main() {
 		root = "."
 	}
 
-	ptfs := ptfs.NewPtfs(root)
+	ptfs := ptfs.New(root)
 	host := fuse.NewFileSystemHost(ptfs)
 	if "windows" == runtime.GOOS {
 		host.SetCapCaseInsensitive(true)

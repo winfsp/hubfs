@@ -52,7 +52,7 @@ func main() {
 		if nil != err {
 			panic(err)
 		}
-		fslist = append(fslist, ptfs.NewPtfs(r))
+		fslist = append(fslist, ptfs.New(r))
 
 	}
 
