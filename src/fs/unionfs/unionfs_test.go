@@ -563,7 +563,7 @@ func TestUnionfs(t *testing.T) {
 	cfs := newTestfs()
 	fs1 := newTestfs()
 	fs2 := newTestfs()
-	ufs := New(Config{Fslist: []fuse.FileSystemInterface{fs1, fs2}, Lazytick: -1})
+	ufs := New(Config{Fslist: []fuse.FileSystemInterface{fs1, fs2}})
 	ufs.Init()
 	defer ufs.Destroy()
 

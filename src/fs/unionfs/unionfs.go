@@ -62,6 +62,8 @@ func New(c Config) fuse.FileSystemInterface {
 		c.Pmname = ".unionfs"
 	}
 	if 0 > c.Lazytick {
+		c.Lazytick = 0
+	} else if 0 == c.Lazytick {
 		c.Lazytick = 10 * time.Second
 	}
 
