@@ -565,6 +565,7 @@ func TestUnionfs(t *testing.T) {
 	fs2 := newTestfs()
 	ufs := NewUnionfs([]fuse.FileSystemInterface{fs1, fs2}, "", false)
 	ufs.Init()
+	defer ufs.Destroy()
 
 	var errc int
 	var err error

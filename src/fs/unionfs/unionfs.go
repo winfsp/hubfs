@@ -17,18 +17,23 @@ import (
 	pathutil "path"
 	"sort"
 	"sync"
+	"time"
 
 	"github.com/billziss-gh/cgofuse/fuse"
 )
 
 type Unionfs struct {
-	fslist  []fuse.FileSystemInterface // file system list
-	pmpath  string                     // path map file path
-	nsmux   sync.RWMutex               // namespace mutex
-	pathmux sync.Mutex                 // path map mutex
-	pathmap *Pathmap                   // path map
-	filemux sync.Mutex                 // open file mutex
-	filemap *Filemap                   // open file map
+	fslist    []fuse.FileSystemInterface // file system list
+	pmpath    string                     // path map file path
+	lazytick  time.Duration              // lazy writevis tick
+	nsmux     sync.RWMutex               // namespace mutex
+	pathmux   sync.Mutex                 // path map mutex
+	pathmap   *Pathmap                   // path map
+	filemux   sync.Mutex                 // open file mutex
+	filemap   *Filemap                   // open file map
+	writemux  sync.Mutex                 // writevis mutex
+	lazystopC chan struct{}              // lazy writevis stop channel
+	lazystopW *sync.WaitGroup            // lazy writevis stop waitgroup
 
 	// lock hierarchy:
 	//     nsmux -> pathmux
@@ -49,10 +54,12 @@ func NewUnionfs(fslist []fuse.FileSystemInterface, pmname string, caseins bool) 
 	if "" == pmname {
 		pmname = ".unionfs"
 	}
+	lazytick := 10 * time.Second
 
 	fs := &Unionfs{}
 	fs.fslist = append(fs.fslist, fslist...)
 	fs.pmpath = pathutil.Join("/", pmname)
+	fs.lazytick = lazytick
 	_, fs.pathmap = OpenPathmap(fs.fslist[0], fs.pmpath, caseins)
 	if nil == fs.pathmap {
 		return nil
@@ -131,6 +138,27 @@ func (fs *Unionfs) setvisif(path string, v uint8) {
 	fs.pathmux.Lock()
 	fs.pathmap.SetIf(path, v)
 	fs.pathmux.Unlock()
+}
+
+func (fs *Unionfs) writevis() (errc int) {
+	fs.writemux.Lock()
+	errc = fs.pathmap.Write()
+	fs.writemux.Unlock()
+	return
+}
+
+func (fs *Unionfs) _lazyWritevis() {
+	defer fs.lazystopW.Done()
+	ticker := time.NewTicker(fs.lazytick)
+	for {
+		select {
+		case <-ticker.C:
+			fs.writevis()
+		case <-fs.lazystopC:
+			ticker.Stop()
+			return
+		}
+	}
 }
 
 func (fs *Unionfs) lsdir(path string,
@@ -795,14 +823,30 @@ func (fs *Unionfs) Init() {
 	for _, fs := range fs.fslist {
 		fs.Init()
 	}
+
+	if 0 != fs.lazytick {
+		fs.lazystopC = make(chan struct{}, 1)
+		fs.lazystopW = &sync.WaitGroup{}
+		fs.lazystopW.Add(1)
+		go fs._lazyWritevis()
+	}
 }
 
 func (fs *Unionfs) Destroy() {
-	fs.pathmap.Write()
+	if 0 != fs.lazytick {
+		fs.lazystopC <- struct{}{}
+		fs.lazystopW.Wait()
+		close(fs.lazystopC)
+		fs.lazystopC = nil
+		fs.lazystopW = nil
+	}
+
+	fs.writevis()
+	fs.pathmap.Close()
+
 	for _, fs := range fs.fslist {
 		fs.Destroy()
 	}
-	fs.pathmap.Close()
 }
 
 func (fs *Unionfs) Statfs(path string, stat *fuse.Statfs_t) (errc int) {
@@ -1050,7 +1094,12 @@ func (fs *Unionfs) Fsyncdir(path string, datasync bool, fh uint64) (errc int) {
 		return 0 // return success if not writable
 	}
 
-	return fs.fslist[v].Fsyncdir(path, datasync, fh)
+	errc = fs.fslist[v].Fsyncdir(path, datasync, fh)
+	if 0 == errc {
+		fs.writevis()
+	}
+
+	return
 }
 
 func (fs *Unionfs) Setxattr(path string, name string, value []byte, flags int) (errc int) {
