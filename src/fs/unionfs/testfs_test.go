@@ -21,5 +21,5 @@ import (
 func newTestfs() fuse.FileSystemInterface {
 	fuse.OptParse([]string{}, "")
 
-	return memfs.NewMemfs()
+	return memfs.New()
 }
