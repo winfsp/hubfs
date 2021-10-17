@@ -61,7 +61,7 @@ func main() {
 		caseins = true
 	}
 
-	unfs := unionfs.NewUnionfs(fslist, "", caseins)
+	unfs := unionfs.New(unionfs.Config{Fslist: fslist, Caseins: caseins})
 	host := fuse.NewFileSystemHost(unfs)
 	if caseins {
 		host.SetCapCaseInsensitive(caseins)

@@ -22,7 +22,7 @@ import (
 	"github.com/billziss-gh/cgofuse/fuse"
 )
 
-type Unionfs struct {
+type filesystem struct {
 	fslist    []fuse.FileSystemInterface // file system list
 	pmpath    string                     // path map file path
 	lazytick  time.Duration              // lazy writevis tick
@@ -47,29 +47,38 @@ type file struct {
 	flags int
 }
 
-func NewUnionfs(fslist []fuse.FileSystemInterface, pmname string, caseins bool) *Unionfs {
-	if 0 == len(fslist) {
-		fslist = []fuse.FileSystemInterface{&fuse.FileSystemBase{}}
-	}
-	if "" == pmname {
-		pmname = ".unionfs"
-	}
-	lazytick := 10 * time.Second
+type Config struct {
+	Fslist   []fuse.FileSystemInterface
+	Pmname   string
+	Lazytick time.Duration
+	Caseins  bool
+}
 
-	fs := &Unionfs{}
-	fs.fslist = append(fs.fslist, fslist...)
-	fs.pmpath = pathutil.Join("/", pmname)
-	fs.lazytick = lazytick
-	_, fs.pathmap = OpenPathmap(fs.fslist[0], fs.pmpath, caseins)
+func New(c Config) fuse.FileSystemInterface {
+	if 0 == len(c.Fslist) {
+		c.Fslist = []fuse.FileSystemInterface{&fuse.FileSystemBase{}}
+	}
+	if "" == c.Pmname {
+		c.Pmname = ".unionfs"
+	}
+	if 0 > c.Lazytick {
+		c.Lazytick = 10 * time.Second
+	}
+
+	fs := &filesystem{}
+	fs.fslist = append(fs.fslist, c.Fslist...)
+	fs.pmpath = pathutil.Join("/", c.Pmname)
+	fs.lazytick = c.Lazytick
+	_, fs.pathmap = OpenPathmap(fs.fslist[0], fs.pmpath, c.Caseins)
 	if nil == fs.pathmap {
 		return nil
 	}
-	fs.filemap = NewFilemap(fs, caseins)
+	fs.filemap = NewFilemap(fs, c.Caseins)
 
 	return fs
 }
 
-func (fs *Unionfs) getvis(path string, stat *fuse.Stat_t) (errc int, isopq bool, v uint8) {
+func (fs *filesystem) getvis(path string, stat *fuse.Stat_t) (errc int, isopq bool, v uint8) {
 	fs.pathmux.Lock()
 	isopq, v = fs.pathmap.Get(path)
 	fs.pathmux.Unlock()
@@ -121,33 +130,33 @@ func (fs *Unionfs) getvis(path string, stat *fuse.Stat_t) (errc int, isopq bool,
 	return
 }
 
-func (fs *Unionfs) hasvis(path string) (res bool) {
+func (fs *filesystem) hasvis(path string) (res bool) {
 	fs.pathmux.Lock()
 	res = fs.pathmap.Has(path)
 	fs.pathmux.Unlock()
 	return
 }
 
-func (fs *Unionfs) setvis(path string, v uint8) {
+func (fs *filesystem) setvis(path string, v uint8) {
 	fs.pathmux.Lock()
 	fs.pathmap.Set(path, v)
 	fs.pathmux.Unlock()
 }
 
-func (fs *Unionfs) setvisif(path string, v uint8) {
+func (fs *filesystem) setvisif(path string, v uint8) {
 	fs.pathmux.Lock()
 	fs.pathmap.SetIf(path, v)
 	fs.pathmux.Unlock()
 }
 
-func (fs *Unionfs) writevis() (errc int) {
+func (fs *filesystem) writevis() (errc int) {
 	fs.writemux.Lock()
 	errc = fs.pathmap.Write()
 	fs.writemux.Unlock()
 	return
 }
 
-func (fs *Unionfs) _lazyWritevis() {
+func (fs *filesystem) _lazyWritevis() {
 	defer fs.lazystopW.Done()
 	ticker := time.NewTicker(fs.lazytick)
 	for {
@@ -161,7 +170,7 @@ func (fs *Unionfs) _lazyWritevis() {
 	}
 }
 
-func (fs *Unionfs) lsdir(path string,
+func (fs *filesystem) lsdir(path string,
 	isopq bool, v uint8, fh uint64,
 	fill func(name string, stat *fuse.Stat_t, ofst int64) bool) {
 
@@ -242,7 +251,7 @@ func (fs *Unionfs) lsdir(path string,
 	}
 }
 
-func (fs *Unionfs) notempty(path string, isopq bool, v uint8) (res bool) {
+func (fs *filesystem) notempty(path string, isopq bool, v uint8) (res bool) {
 	fs.lsdir(path, isopq, v, ^uint64(0), func(name string, stat *fuse.Stat_t, ofst int64) bool {
 		res = true
 		return false
@@ -251,7 +260,7 @@ func (fs *Unionfs) notempty(path string, isopq bool, v uint8) (res bool) {
 	return
 }
 
-func (fs *Unionfs) mkpdir(path string) (errc int) {
+func (fs *filesystem) mkpdir(path string) (errc int) {
 	path = pathutil.Dir(path)
 
 	pdir := path
@@ -297,7 +306,7 @@ func (fs *Unionfs) mkpdir(path string) (errc int) {
 	return
 }
 
-func (fs *Unionfs) _cpdir(path string, v uint8, stat *fuse.Stat_t) (errc int) {
+func (fs *filesystem) _cpdir(path string, v uint8, stat *fuse.Stat_t) (errc int) {
 	dstfs := fs.fslist[0]
 
 	mode := stat.Mode & 0777
@@ -326,12 +335,12 @@ func (fs *Unionfs) _cpdir(path string, v uint8, stat *fuse.Stat_t) (errc int) {
 	return
 }
 
-func (fs *Unionfs) _cpxattr(path string, v uint8) (errc int) {
+func (fs *filesystem) _cpxattr(path string, v uint8) (errc int) {
 	errc = -fuse.ENOSYS
 	return
 }
 
-func (fs *Unionfs) cpdir(path string, v uint8, stat *fuse.Stat_t) (errc int) {
+func (fs *filesystem) cpdir(path string, v uint8, stat *fuse.Stat_t) (errc int) {
 	if nil == stat {
 		stat = &fuse.Stat_t{}
 		errc = fs.fslist[v].Getattr(path, stat, ^uint64(0))
@@ -348,7 +357,7 @@ func (fs *Unionfs) cpdir(path string, v uint8, stat *fuse.Stat_t) (errc int) {
 	return fs._cpdir(path, v, stat)
 }
 
-func (fs *Unionfs) cplink(path string, v uint8, stat *fuse.Stat_t) (errc int) {
+func (fs *filesystem) cplink(path string, v uint8, stat *fuse.Stat_t) (errc int) {
 	srcfs := fs.fslist[v]
 	dstfs := fs.fslist[0]
 
@@ -395,7 +404,7 @@ func (fs *Unionfs) cplink(path string, v uint8, stat *fuse.Stat_t) (errc int) {
 	return
 }
 
-func (fs *Unionfs) cpfile(path string, v uint8, stat *fuse.Stat_t, srcfh uint64) (errc int) {
+func (fs *filesystem) cpfile(path string, v uint8, stat *fuse.Stat_t, srcfh uint64) (errc int) {
 	srcfs := fs.fslist[v]
 	dstfs := fs.fslist[0]
 
@@ -483,7 +492,7 @@ func (fs *Unionfs) cpfile(path string, v uint8, stat *fuse.Stat_t, srcfh uint64)
 	return
 }
 
-func (fs *Unionfs) cpany(path string, v uint8, stat *fuse.Stat_t) (errc int) {
+func (fs *filesystem) cpany(path string, v uint8, stat *fuse.Stat_t) (errc int) {
 	if nil == stat {
 		stat = &fuse.Stat_t{}
 		errc = fs.fslist[v].Getattr(path, stat, ^uint64(0))
@@ -504,7 +513,7 @@ func (fs *Unionfs) cpany(path string, v uint8, stat *fuse.Stat_t) (errc int) {
 	return
 }
 
-func (fs *Unionfs) cptree(path string, v uint8, stat *fuse.Stat_t, paths *[]string) (errc int) {
+func (fs *filesystem) cptree(path string, v uint8, stat *fuse.Stat_t, paths *[]string) (errc int) {
 	if nil == stat {
 		stat = &fuse.Stat_t{}
 		errc = fs.fslist[v].Getattr(path, stat, ^uint64(0))
@@ -539,7 +548,7 @@ func (fs *Unionfs) cptree(path string, v uint8, stat *fuse.Stat_t, paths *[]stri
 	return
 }
 
-func (fs *Unionfs) mknode(path string, isdir bool, fn func(v uint8) int) (errc int) {
+func (fs *filesystem) mknode(path string, isdir bool, fn func(v uint8) int) (errc int) {
 	if hasPathPrefix(path, fs.pmpath) {
 		return -fuse.EPERM
 	}
@@ -571,7 +580,7 @@ func (fs *Unionfs) mknode(path string, isdir bool, fn func(v uint8) int) (errc i
 	return
 }
 
-func (fs *Unionfs) rmnode(path string, isdir bool, fn func(v uint8) int) (errc int) {
+func (fs *filesystem) rmnode(path string, isdir bool, fn func(v uint8) int) (errc int) {
 	if hasPathPrefix(path, fs.pmpath) {
 		return -fuse.EPERM
 	}
@@ -613,7 +622,7 @@ func (fs *Unionfs) rmnode(path string, isdir bool, fn func(v uint8) int) (errc i
 	return
 }
 
-func (fs *Unionfs) renode(oldpath string, newpath string, link bool, fn func(v uint8) int) (errc int) {
+func (fs *filesystem) renode(oldpath string, newpath string, link bool, fn func(v uint8) int) (errc int) {
 	if hasPathPrefix(oldpath, fs.pmpath) || hasPathPrefix(newpath, fs.pmpath) {
 		return -fuse.EPERM
 	}
@@ -677,7 +686,7 @@ func (fs *Unionfs) renode(oldpath string, newpath string, link bool, fn func(v u
 	return
 }
 
-func (fs *Unionfs) getnode(path string, fn func(isopq bool, v uint8) int) (errc int) {
+func (fs *filesystem) getnode(path string, fn func(isopq bool, v uint8) int) (errc int) {
 	if hasPathPrefix(path, fs.pmpath) {
 		return -fuse.EPERM
 	}
@@ -697,7 +706,7 @@ func (fs *Unionfs) getnode(path string, fn func(isopq bool, v uint8) int) (errc 
 	return
 }
 
-func (fs *Unionfs) setnode(path string, fn func(v uint8) int) (errc int) {
+func (fs *filesystem) setnode(path string, fn func(v uint8) int) (errc int) {
 	if hasPathPrefix(path, fs.pmpath) {
 		return -fuse.EPERM
 	}
@@ -724,7 +733,7 @@ func (fs *Unionfs) setnode(path string, fn func(v uint8) int) (errc int) {
 	return
 }
 
-func (fs *Unionfs) CopyFile(path string, f0 interface{}) bool {
+func (fs *filesystem) CopyFile(path string, f0 interface{}) bool {
 	f := f0.(*file)
 	if 0 == f.v {
 		return false
@@ -748,7 +757,7 @@ func (fs *Unionfs) CopyFile(path string, f0 interface{}) bool {
 	return true
 }
 
-func (fs *Unionfs) ReopenFile(oldpath string, newpath string, f0 interface{}) {
+func (fs *filesystem) ReopenFile(oldpath string, newpath string, f0 interface{}) {
 	f := f0.(*file)
 
 	if "" != oldpath && ^uint64(0) != f.fh {
@@ -771,7 +780,7 @@ func (fs *Unionfs) ReopenFile(oldpath string, newpath string, f0 interface{}) {
 	}
 }
 
-func (fs *Unionfs) newfile(path string, isopq bool, v uint8, fh uint64, flags int) (wrapfh uint64) {
+func (fs *filesystem) newfile(path string, isopq bool, v uint8, fh uint64, flags int) (wrapfh uint64) {
 	fs.filemux.Lock()
 	f := &file{isopq, v, fh, flags}
 	wrapfh = fs.filemap.NewFile(path, f, 0 != v)
@@ -779,13 +788,13 @@ func (fs *Unionfs) newfile(path string, isopq bool, v uint8, fh uint64, flags in
 	return
 }
 
-func (fs *Unionfs) delfile(path string, wrapfh uint64) {
+func (fs *filesystem) delfile(path string, wrapfh uint64) {
 	fs.filemux.Lock()
 	fs.filemap.DelFile(path, wrapfh)
 	fs.filemux.Unlock()
 }
 
-func (fs *Unionfs) getfile(path string, wrapfh uint64) (isopq bool, v uint8, fh uint64) {
+func (fs *filesystem) getfile(path string, wrapfh uint64) (isopq bool, v uint8, fh uint64) {
 	v = UNKNOWN
 	fh = ^uint64(0)
 
@@ -799,7 +808,7 @@ func (fs *Unionfs) getfile(path string, wrapfh uint64) (isopq bool, v uint8, fh 
 	return
 }
 
-func (fs *Unionfs) getwfile(path string, wrapfh uint64) (v uint8, fh uint64) {
+func (fs *filesystem) getwfile(path string, wrapfh uint64) (v uint8, fh uint64) {
 	v = UNKNOWN
 	fh = ^uint64(0)
 
@@ -813,13 +822,13 @@ func (fs *Unionfs) getwfile(path string, wrapfh uint64) (v uint8, fh uint64) {
 	return
 }
 
-func (fs *Unionfs) invfile(path string) {
+func (fs *filesystem) invfile(path string) {
 	fs.filemux.Lock()
 	fs.filemap.Remove(path)
 	fs.filemux.Unlock()
 }
 
-func (fs *Unionfs) Init() {
+func (fs *filesystem) Init() {
 	for _, fs := range fs.fslist {
 		fs.Init()
 	}
@@ -832,7 +841,7 @@ func (fs *Unionfs) Init() {
 	}
 }
 
-func (fs *Unionfs) Destroy() {
+func (fs *filesystem) Destroy() {
 	if 0 != fs.lazytick {
 		fs.lazystopC <- struct{}{}
 		fs.lazystopW.Wait()
@@ -849,7 +858,7 @@ func (fs *Unionfs) Destroy() {
 	}
 }
 
-func (fs *Unionfs) Statfs(path string, stat *fuse.Statfs_t) (errc int) {
+func (fs *filesystem) Statfs(path string, stat *fuse.Statfs_t) (errc int) {
 	errc = -fuse.ENOSYS
 
 	for _, fs := range fs.fslist {
@@ -861,43 +870,43 @@ func (fs *Unionfs) Statfs(path string, stat *fuse.Statfs_t) (errc int) {
 	return
 }
 
-func (fs *Unionfs) Mknod(path string, mode uint32, dev uint64) (errc int) {
+func (fs *filesystem) Mknod(path string, mode uint32, dev uint64) (errc int) {
 	return fs.mknode(path, false, func(v uint8) int {
 		return fs.fslist[v].Mknod(path, mode, dev)
 	})
 }
 
-func (fs *Unionfs) Mkdir(path string, mode uint32) (errc int) {
+func (fs *filesystem) Mkdir(path string, mode uint32) (errc int) {
 	return fs.mknode(path, true, func(v uint8) int {
 		return fs.fslist[v].Mkdir(path, mode)
 	})
 }
 
-func (fs *Unionfs) Unlink(path string) (errc int) {
+func (fs *filesystem) Unlink(path string) (errc int) {
 	return fs.rmnode(path, false, func(v uint8) int {
 		return fs.fslist[v].Unlink(path)
 	})
 }
 
-func (fs *Unionfs) Rmdir(path string) (errc int) {
+func (fs *filesystem) Rmdir(path string) (errc int) {
 	return fs.rmnode(path, true, func(v uint8) int {
 		return fs.fslist[v].Rmdir(path)
 	})
 }
 
-func (fs *Unionfs) Link(oldpath string, newpath string) (errc int) {
+func (fs *filesystem) Link(oldpath string, newpath string) (errc int) {
 	return fs.renode(oldpath, newpath, true, func(v uint8) int {
 		return fs.fslist[v].Link(oldpath, newpath)
 	})
 }
 
-func (fs *Unionfs) Symlink(target string, newpath string) (errc int) {
+func (fs *filesystem) Symlink(target string, newpath string) (errc int) {
 	return fs.mknode(newpath, false, func(v uint8) int {
 		return fs.fslist[v].Symlink(target, newpath)
 	})
 }
 
-func (fs *Unionfs) Readlink(path string) (errc int, target string) {
+func (fs *filesystem) Readlink(path string) (errc int, target string) {
 	errc = fs.getnode(path, func(isopq bool, v uint8) int {
 		errc, target = fs.fslist[v].Readlink(path)
 		return errc
@@ -905,37 +914,37 @@ func (fs *Unionfs) Readlink(path string) (errc int, target string) {
 	return
 }
 
-func (fs *Unionfs) Rename(oldpath string, newpath string) (errc int) {
+func (fs *filesystem) Rename(oldpath string, newpath string) (errc int) {
 	return fs.renode(oldpath, newpath, false, func(v uint8) int {
 		return fs.fslist[v].Rename(oldpath, newpath)
 	})
 }
 
-func (fs *Unionfs) Chmod(path string, mode uint32) (errc int) {
+func (fs *filesystem) Chmod(path string, mode uint32) (errc int) {
 	return fs.setnode(path, func(v uint8) int {
 		return fs.fslist[v].Chmod(path, mode)
 	})
 }
 
-func (fs *Unionfs) Chown(path string, uid uint32, gid uint32) (errc int) {
+func (fs *filesystem) Chown(path string, uid uint32, gid uint32) (errc int) {
 	return fs.setnode(path, func(v uint8) int {
 		return fs.fslist[v].Chown(path, uid, gid)
 	})
 }
 
-func (fs *Unionfs) Utimens(path string, tmsp []fuse.Timespec) (errc int) {
+func (fs *filesystem) Utimens(path string, tmsp []fuse.Timespec) (errc int) {
 	return fs.setnode(path, func(v uint8) int {
 		return fs.fslist[v].Utimens(path, tmsp)
 	})
 }
 
-func (fs *Unionfs) Access(path string, mask uint32) (errc int) {
+func (fs *filesystem) Access(path string, mask uint32) (errc int) {
 	return fs.getnode(path, func(isopq bool, v uint8) int {
 		return fs.fslist[v].Access(path, mask)
 	})
 }
 
-func (fs *Unionfs) Create(path string, flags int, mode uint32) (errc int, fh uint64) {
+func (fs *filesystem) Create(path string, flags int, mode uint32) (errc int, fh uint64) {
 	errc = fs.mknode(path, false, func(v uint8) int {
 		errc, fh = fs.fslist[v].Create(path, flags, mode)
 		if 0 == errc {
@@ -946,7 +955,7 @@ func (fs *Unionfs) Create(path string, flags int, mode uint32) (errc int, fh uin
 	return
 }
 
-func (fs *Unionfs) Open(path string, flags int) (errc int, fh uint64) {
+func (fs *filesystem) Open(path string, flags int) (errc int, fh uint64) {
 	errc = fs.getnode(path, func(isopq bool, v uint8) int {
 		errc, fh = fs.fslist[v].Open(path, flags)
 		if 0 == errc {
@@ -957,7 +966,7 @@ func (fs *Unionfs) Open(path string, flags int) (errc int, fh uint64) {
 	return
 }
 
-func (fs *Unionfs) Getattr(path string, stat *fuse.Stat_t, fh uint64) (errc int) {
+func (fs *filesystem) Getattr(path string, stat *fuse.Stat_t, fh uint64) (errc int) {
 	if ^uint64(0) == fh {
 		if hasPathPrefix(path, fs.pmpath) {
 			return -fuse.EPERM
@@ -978,7 +987,7 @@ func (fs *Unionfs) Getattr(path string, stat *fuse.Stat_t, fh uint64) (errc int)
 	}
 }
 
-func (fs *Unionfs) Truncate(path string, size int64, fh uint64) (errc int) {
+func (fs *filesystem) Truncate(path string, size int64, fh uint64) (errc int) {
 	if ^uint64(0) == fh {
 		return fs.setnode(path, func(v uint8) int {
 			return fs.fslist[v].Truncate(path, size, fh)
@@ -993,7 +1002,7 @@ func (fs *Unionfs) Truncate(path string, size int64, fh uint64) (errc int) {
 	}
 }
 
-func (fs *Unionfs) Read(path string, buff []byte, ofst int64, fh uint64) (errc int) {
+func (fs *filesystem) Read(path string, buff []byte, ofst int64, fh uint64) (errc int) {
 	_, v, fh := fs.getfile(path, fh)
 	if UNKNOWN == v {
 		return -fuse.EIO
@@ -1002,7 +1011,7 @@ func (fs *Unionfs) Read(path string, buff []byte, ofst int64, fh uint64) (errc i
 	return fs.fslist[v].Read(path, buff, ofst, fh)
 }
 
-func (fs *Unionfs) Write(path string, buff []byte, ofst int64, fh uint64) (errc int) {
+func (fs *filesystem) Write(path string, buff []byte, ofst int64, fh uint64) (errc int) {
 	v, fh := fs.getwfile(path, fh)
 	if UNKNOWN == v {
 		return -fuse.EIO
@@ -1011,7 +1020,7 @@ func (fs *Unionfs) Write(path string, buff []byte, ofst int64, fh uint64) (errc 
 	return fs.fslist[v].Write(path, buff, ofst, fh)
 }
 
-func (fs *Unionfs) Flush(path string, fh uint64) (errc int) {
+func (fs *filesystem) Flush(path string, fh uint64) (errc int) {
 	_, v, fh := fs.getfile(path, fh)
 	if 0 != v {
 		return 0 // return success if not writable
@@ -1020,7 +1029,7 @@ func (fs *Unionfs) Flush(path string, fh uint64) (errc int) {
 	return fs.fslist[v].Flush(path, fh)
 }
 
-func (fs *Unionfs) Release(path string, fh uint64) (errc int) {
+func (fs *filesystem) Release(path string, fh uint64) (errc int) {
 	wrapfh := fh
 
 	_, v, fh := fs.getfile("", fh)
@@ -1037,7 +1046,7 @@ func (fs *Unionfs) Release(path string, fh uint64) (errc int) {
 	return
 }
 
-func (fs *Unionfs) Fsync(path string, datasync bool, fh uint64) (errc int) {
+func (fs *filesystem) Fsync(path string, datasync bool, fh uint64) (errc int) {
 	_, v, fh := fs.getfile(path, fh)
 	if 0 != v {
 		return 0 // return success if not writable
@@ -1046,7 +1055,7 @@ func (fs *Unionfs) Fsync(path string, datasync bool, fh uint64) (errc int) {
 	return fs.fslist[v].Fsync(path, datasync, fh)
 }
 
-func (fs *Unionfs) Opendir(path string) (errc int, fh uint64) {
+func (fs *filesystem) Opendir(path string) (errc int, fh uint64) {
 	errc = fs.getnode(path, func(isopq bool, v uint8) int {
 		errc, fh = fs.fslist[v].Opendir(path)
 		if 0 == errc {
@@ -1057,7 +1066,7 @@ func (fs *Unionfs) Opendir(path string) (errc int, fh uint64) {
 	return
 }
 
-func (fs *Unionfs) Readdir(path string,
+func (fs *filesystem) Readdir(path string,
 	fill func(name string, stat *fuse.Stat_t, ofst int64) bool,
 	ofst int64,
 	fh uint64) (errc int) {
@@ -1071,7 +1080,7 @@ func (fs *Unionfs) Readdir(path string,
 	return 0
 }
 
-func (fs *Unionfs) Releasedir(path string, fh uint64) (errc int) {
+func (fs *filesystem) Releasedir(path string, fh uint64) (errc int) {
 	wrapfh := fh
 
 	_, v, fh := fs.getfile("", fh)
@@ -1088,7 +1097,7 @@ func (fs *Unionfs) Releasedir(path string, fh uint64) (errc int) {
 	return
 }
 
-func (fs *Unionfs) Fsyncdir(path string, datasync bool, fh uint64) (errc int) {
+func (fs *filesystem) Fsyncdir(path string, datasync bool, fh uint64) (errc int) {
 	_, v, fh := fs.getfile(path, fh)
 	if 0 != v {
 		return 0 // return success if not writable
@@ -1102,13 +1111,13 @@ func (fs *Unionfs) Fsyncdir(path string, datasync bool, fh uint64) (errc int) {
 	return
 }
 
-func (fs *Unionfs) Setxattr(path string, name string, value []byte, flags int) (errc int) {
+func (fs *filesystem) Setxattr(path string, name string, value []byte, flags int) (errc int) {
 	return fs.setnode(path, func(v uint8) int {
 		return fs.fslist[v].Setxattr(path, name, value, flags)
 	})
 }
 
-func (fs *Unionfs) Getxattr(path string, name string) (errc int, value []byte) {
+func (fs *filesystem) Getxattr(path string, name string) (errc int, value []byte) {
 	errc = fs.getnode(path, func(isopq bool, v uint8) int {
 		errc, value = fs.fslist[v].Getxattr(path, name)
 		return errc
@@ -1116,19 +1125,19 @@ func (fs *Unionfs) Getxattr(path string, name string) (errc int, value []byte) {
 	return
 }
 
-func (fs *Unionfs) Removexattr(path string, name string) (errc int) {
+func (fs *filesystem) Removexattr(path string, name string) (errc int) {
 	return fs.setnode(path, func(v uint8) int {
 		return fs.fslist[v].Removexattr(path, name)
 	})
 }
 
-func (fs *Unionfs) Listxattr(path string, fill func(name string) bool) (errc int) {
+func (fs *filesystem) Listxattr(path string, fill func(name string) bool) (errc int) {
 	return fs.getnode(path, func(isopq bool, v uint8) int {
 		return fs.fslist[v].Listxattr(path, fill)
 	})
 }
 
-func (fs *Unionfs) Chflags(path string, flags uint32) (errc int) {
+func (fs *filesystem) Chflags(path string, flags uint32) (errc int) {
 	intf, ok := fs.fslist[0].(fuse.FileSystemChflags)
 	if !ok {
 		return -fuse.ENOSYS
@@ -1139,7 +1148,7 @@ func (fs *Unionfs) Chflags(path string, flags uint32) (errc int) {
 	})
 }
 
-func (fs *Unionfs) Setcrtime(path string, tmsp fuse.Timespec) (errc int) {
+func (fs *filesystem) Setcrtime(path string, tmsp fuse.Timespec) (errc int) {
 	intf, ok := fs.fslist[0].(fuse.FileSystemSetcrtime)
 	if !ok {
 		return -fuse.ENOSYS
@@ -1150,7 +1159,7 @@ func (fs *Unionfs) Setcrtime(path string, tmsp fuse.Timespec) (errc int) {
 	})
 }
 
-func (fs *Unionfs) Setchgtime(path string, tmsp fuse.Timespec) (errc int) {
+func (fs *filesystem) Setchgtime(path string, tmsp fuse.Timespec) (errc int) {
 	intf, ok := fs.fslist[0].(fuse.FileSystemSetchgtime)
 	if !ok {
 		return -fuse.ENOSYS
@@ -1166,7 +1175,7 @@ func hasPathPrefix(path, prefix string) bool {
 		(len(path) > len(prefix) && path[:len(prefix)] == prefix && path[len(prefix)] == '/')
 }
 
-var _ fuse.FileSystemInterface = (*Unionfs)(nil)
-var _ fuse.FileSystemChflags = (*Unionfs)(nil)
-var _ fuse.FileSystemSetcrtime = (*Unionfs)(nil)
-var _ fuse.FileSystemSetchgtime = (*Unionfs)(nil)
+var _ fuse.FileSystemInterface = (*filesystem)(nil)
+var _ fuse.FileSystemChflags = (*filesystem)(nil)
+var _ fuse.FileSystemSetcrtime = (*filesystem)(nil)
+var _ fuse.FileSystemSetchgtime = (*filesystem)(nil)
