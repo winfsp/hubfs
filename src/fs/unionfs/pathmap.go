@@ -147,7 +147,7 @@ func (pm *Pathmap) Close() {
 	*pm = Pathmap{}
 }
 
-// Function Get returns opaqueness and visibility information.
+// Function Get returns opaqueness and visibility information for a path.
 // Visibility can be one of: unknown, whiteout, notexist, 0, 1, 2, ...
 func (pm *Pathmap) Get(path string) (isopq bool, v uint8) {
 	var ok bool
@@ -188,7 +188,7 @@ func (pm *Pathmap) Get(path string) (isopq bool, v uint8) {
 	return
 }
 
-// Function Has returns if visibility information exists.
+// Function Has returns if visibility information exists for a path.
 func (pm *Pathmap) Has(path string) (ok bool) {
 	k := ComputePathkey(path, pm.Caseins)
 	_, ok = pm.vm[k]
@@ -196,7 +196,19 @@ func (pm *Pathmap) Has(path string) (ok bool) {
 	return
 }
 
-// Function Set sets visibility information.
+// Function IsDirty determines if a path is "dirty"
+// (i.e. it has visibility information changes that have not been written).
+func (pm *Pathmap) IsDirty(path string) (dirt bool) {
+	k := ComputePathkey(path, pm.Caseins)
+	v, ok := pm.vm[k]
+	if ok {
+		dirt = 0 != v&_DIRT
+	}
+
+	return
+}
+
+// Function Set sets visibility information for path.
 // Visibility can be one of: opaque, whiteout, notexist, 0, 1, 2, ...
 func (pm *Pathmap) Set(path string, v uint8) {
 	if _MAXVIS < v {
@@ -207,19 +219,19 @@ func (pm *Pathmap) Set(path string, v uint8) {
 	u, ok := pm.vm[k]
 	if !ok {
 		u = UNKNOWN
+
+		if pathmapdbg {
+			if nil == pathmapdbgMap {
+				pathmapdbgMap = make(map[Pathkey]string)
+			}
+			pathmapdbgMap[k] = path
+		}
 	}
 
 	pm.vm[k] = _pathmapNewv(u, v)
-
-	if pathmapdbg {
-		if nil == pathmapdbgMap {
-			pathmapdbgMap = make(map[Pathkey]string)
-		}
-		pathmapdbgMap[k] = path
-	}
 }
 
-// Function SetIf sets visibility information only if some already exists.
+// Function SetIf sets visibility information for a path only if some already exists.
 // Visibility can be one of: opaque, whiteout, notexist, 0, 1, 2, ...
 func (pm *Pathmap) SetIf(path string, v uint8) {
 	if _MAXVIS < v {
@@ -654,14 +666,12 @@ func _pathmapNewv(u uint8, v uint8) uint8 {
 }
 
 func _pathmapKtoa(k Pathkey) string {
-	if pathmapdbg {
-		if nil != pathmapdbgMap {
-			q := k
-			q[0] = 0
-			if path, ok := pathmapdbgMap[q]; ok {
-				return fmt.Sprintf("%02x%02x%02x%02x%02x%02x%02x%02x (%s)",
-					k[0], k[1], k[2], k[3], k[4], k[5], k[6], k[7], path)
-			}
+	if nil != pathmapdbgMap {
+		q := k
+		q[0] = 0
+		if path, ok := pathmapdbgMap[q]; ok {
+			return fmt.Sprintf("%02x%02x%02x%02x%02x%02x%02x%02x (%s)",
+				k[0], k[1], k[2], k[3], k[4], k[5], k[6], k[7], path)
 		}
 	}
 	return fmt.Sprintf("%02x%02x%02x%02x%02x%02x%02x%02x",
