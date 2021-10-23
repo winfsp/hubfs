@@ -23,7 +23,7 @@ import (
 type filesystem struct {
 	topfs   fuse.FileSystemInterface
 	split   func(path string) (string, string)
-	newfs   func(prefix string) fuse.FileSystemInterface
+	newfs   func(prefix string, delfs func()) fuse.FileSystemInterface
 	caseins bool
 	fsmux   sync.Mutex
 	fsmap   map[string]fuse.FileSystemInterface
@@ -32,7 +32,7 @@ type filesystem struct {
 type Config struct {
 	Topfs   fuse.FileSystemInterface
 	Split   func(path string) (string, string)
-	Newfs   func(prefix string) fuse.FileSystemInterface
+	Newfs   func(prefix string, delfs func()) fuse.FileSystemInterface
 	Caseins bool
 }
 
@@ -60,12 +60,24 @@ func (fs *filesystem) getfs(path string) (dstfs fuse.FileSystemInterface, remain
 	fs.fsmux.Lock()
 	dstfs = fs.fsmap[prefix]
 	if nil == dstfs {
-		dstfs = fs.newfs(prefix)
+		dstfs = fs.newfs(prefix, func() {
+			fs._delfs(prefix)
+		})
 		fs.fsmap[prefix] = dstfs
 		dstfs.Init()
 	}
 	fs.fsmux.Unlock()
 	return
+}
+
+func (fs *filesystem) _delfs(prefix string) {
+	fs.fsmux.Lock()
+	dstfs := fs.fsmap[prefix]
+	if nil != dstfs {
+		dstfs.Destroy()
+		delete(fs.fsmap, prefix)
+	}
+	fs.fsmux.Unlock()
 }
 
 func (fs *filesystem) Init() {
