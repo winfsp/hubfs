@@ -11,7 +11,7 @@
  * Software Foundation.
  */
 
-package main
+package hubfs
 
 import (
 	"io"
@@ -25,7 +25,7 @@ import (
 	"github.com/billziss-gh/hubfs/providers"
 )
 
-type Hubfs struct {
+type filesystem struct {
 	fuse.FileSystemBase
 	client  providers.Client
 	prefix  string
@@ -43,47 +43,20 @@ type obstack struct {
 	reader     io.ReaderAt
 }
 
-func fuseErrc(err error) (errc int) {
-	errc = -fuse.EIO
-	if providers.ErrNotFound == err {
-		errc = -fuse.ENOENT
-	}
-	return
+type Config struct {
+	Client providers.Client
+	Prefix string
 }
 
-func fuseStat(stat *fuse.Stat_t, mode uint32, size int64, time time.Time) {
-	switch mode & fuse.S_IFMT {
-	case fuse.S_IFDIR:
-		mode = fuse.S_IFDIR | 0755
-	case fuse.S_IFLNK, 0160000 /* submodule */ :
-		mode = fuse.S_IFLNK | 0777
-	default:
-		mode = fuse.S_IFREG | 0644
-		if 0 != mode&0400 {
-			mode = fuse.S_IFREG | 0755
-		}
-	}
-	ts := fuse.NewTimespec(time)
-	*stat = fuse.Stat_t{
-		Mode:     mode,
-		Nlink:    1,
-		Size:     size,
-		Atim:     ts,
-		Mtim:     ts,
-		Ctim:     ts,
-		Birthtim: ts,
+func New(c Config) fuse.FileSystemInterface {
+	return &filesystem{
+		client:  c.Client,
+		prefix:  c.Prefix,
+		openmap: make(map[uint64]*obstack),
 	}
 }
 
-func split(path string) []string {
-	comp := strings.Split(path, "/")[1:]
-	if 1 == len(comp) && "" == comp[0] {
-		return []string{}
-	}
-	return comp
-}
-
-func (fs *Hubfs) open(path string) (errc int, res *obstack) {
+func (fs *filesystem) open(path string) (errc int, res *obstack) {
 	obs := &obstack{}
 	var err error
 	for i, c := range split(pathutil.Join(fs.prefix, path)) {
@@ -122,7 +95,7 @@ func (fs *Hubfs) open(path string) (errc int, res *obstack) {
 	return
 }
 
-func (fs *Hubfs) release(obs *obstack) {
+func (fs *filesystem) release(obs *obstack) {
 	if nil != obs.repository {
 		fs.client.CloseRepository(obs.repository)
 	}
@@ -131,7 +104,7 @@ func (fs *Hubfs) release(obs *obstack) {
 	}
 }
 
-func (fs *Hubfs) getattr(obs *obstack, entry providers.TreeEntry, path string, stat *fuse.Stat_t) (
+func (fs *filesystem) getattr(obs *obstack, entry providers.TreeEntry, path string, stat *fuse.Stat_t) (
 	target string) {
 
 	if nil != entry {
@@ -161,7 +134,7 @@ func (fs *Hubfs) getattr(obs *obstack, entry providers.TreeEntry, path string, s
 	return
 }
 
-func (fs *Hubfs) Getattr(path string, stat *fuse.Stat_t, fh uint64) (errc int) {
+func (fs *filesystem) Getattr(path string, stat *fuse.Stat_t, fh uint64) (errc int) {
 	defer trace(path, fh)(&errc, stat)
 
 	// The resolve logic below is specific to Windows and WinFsp. An
@@ -219,7 +192,7 @@ retry:
 	return
 }
 
-func (fs *Hubfs) Readlink(path string) (errc int, target string) {
+func (fs *filesystem) Readlink(path string) (errc int, target string) {
 	defer trace(path)(&errc, &target)
 
 	errc, obs := fs.open(path)
@@ -238,7 +211,7 @@ func (fs *Hubfs) Readlink(path string) (errc int, target string) {
 	return
 }
 
-func (fs *Hubfs) Opendir(path string) (errc int, fh uint64) {
+func (fs *filesystem) Opendir(path string) (errc int, fh uint64) {
 	defer trace(path)(&errc, &fh)
 
 	errc, obs := fs.open(path)
@@ -255,7 +228,7 @@ func (fs *Hubfs) Opendir(path string) (errc int, fh uint64) {
 	return
 }
 
-func (fs *Hubfs) Readdir(path string,
+func (fs *filesystem) Readdir(path string,
 	fill func(name string, stat *fuse.Stat_t, ofst int64) bool,
 	ofst int64,
 	fh uint64) (errc int) {
@@ -323,7 +296,7 @@ func (fs *Hubfs) Readdir(path string,
 	return
 }
 
-func (fs *Hubfs) Releasedir(path string, fh uint64) (errc int) {
+func (fs *filesystem) Releasedir(path string, fh uint64) (errc int) {
 	defer trace(path, fh)(&errc)
 
 	fs.lock.Lock()
@@ -342,7 +315,7 @@ func (fs *Hubfs) Releasedir(path string, fh uint64) (errc int) {
 	return
 }
 
-func (fs *Hubfs) Open(path string, flags int) (errc int, fh uint64) {
+func (fs *filesystem) Open(path string, flags int) (errc int, fh uint64) {
 	defer trace(path, flags)(&errc, &fh)
 
 	errc, obs := fs.open(path)
@@ -359,7 +332,7 @@ func (fs *Hubfs) Open(path string, flags int) (errc int, fh uint64) {
 	return
 }
 
-func (fs *Hubfs) Read(path string, buff []byte, ofst int64, fh uint64) (n int) {
+func (fs *filesystem) Read(path string, buff []byte, ofst int64, fh uint64) (n int) {
 	defer trace(path, ofst, fh)(&n)
 
 	var reader io.ReaderAt
@@ -405,7 +378,7 @@ func (fs *Hubfs) Read(path string, buff []byte, ofst int64, fh uint64) (n int) {
 	return
 }
 
-func (fs *Hubfs) Release(path string, fh uint64) (errc int) {
+func (fs *filesystem) Release(path string, fh uint64) (errc int) {
 	defer trace(path, fh)(&errc)
 
 	fs.lock.Lock()
@@ -428,23 +401,44 @@ func (fs *Hubfs) Release(path string, fh uint64) (errc int) {
 	return
 }
 
-func Mount(client providers.Client, prefix string, mntpnt string, config []string) bool {
-	mntopt := []string{}
-	for _, s := range config {
-		mntopt = append(mntopt, "-o"+s)
+func fuseErrc(err error) (errc int) {
+	errc = -fuse.EIO
+	if providers.ErrNotFound == err {
+		errc = -fuse.ENOENT
 	}
+	return
+}
 
-	fs := &Hubfs{
-		client:  client,
-		prefix:  prefix,
-		openmap: make(map[uint64]*obstack),
+func fuseStat(stat *fuse.Stat_t, mode uint32, size int64, time time.Time) {
+	switch mode & fuse.S_IFMT {
+	case fuse.S_IFDIR:
+		mode = fuse.S_IFDIR | 0755
+	case fuse.S_IFLNK, 0160000 /* submodule */ :
+		mode = fuse.S_IFLNK | 0777
+	default:
+		mode = fuse.S_IFREG | 0644
+		if 0 != mode&0400 {
+			mode = fuse.S_IFREG | 0755
+		}
 	}
-	fs.client.StartExpiration()
-	defer fs.client.StopExpiration()
+	ts := fuse.NewTimespec(time)
+	*stat = fuse.Stat_t{
+		Mode:     mode,
+		Nlink:    1,
+		Size:     size,
+		Atim:     ts,
+		Mtim:     ts,
+		Ctim:     ts,
+		Birthtim: ts,
+	}
+}
 
-	host := fuse.NewFileSystemHost(fs)
-	host.SetCapReaddirPlus(true)
-	return host.Mount(mntpnt, mntopt)
+func split(path string) []string {
+	comp := strings.Split(path, "/")[1:]
+	if 1 == len(comp) && "" == comp[0] {
+		return []string{}
+	}
+	return comp
 }
 
 func trace(vals ...interface{}) func(vals ...interface{}) {

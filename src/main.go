@@ -21,8 +21,10 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/billziss-gh/cgofuse/fuse"
 	"github.com/billziss-gh/golib/keyring"
 	libtrace "github.com/billziss-gh/golib/trace"
+	"github.com/billziss-gh/hubfs/fs/hubfs"
 	"github.com/billziss-gh/hubfs/providers"
 )
 
@@ -77,7 +79,25 @@ func authNewClientWithKey(provider providers.Provider, authkey string) (
 	return
 }
 
-func run() (ec int) {
+func mount(client providers.Client, prefix string, mntpnt string, config []string) bool {
+	mntopt := []string{}
+	for _, s := range config {
+		mntopt = append(mntopt, "-o"+s)
+	}
+
+	fs := hubfs.New(hubfs.Config{
+		Client: client,
+		Prefix: prefix,
+	})
+	client.StartExpiration()
+	defer client.StopExpiration()
+
+	host := fuse.NewFileSystemHost(fs)
+	host.SetCapReaddirPlus(true)
+	return host.Mount(mntpnt, mntopt)
+}
+
+func run() int {
 	printver := false
 	authmeth := "full"
 	authkey := ""
@@ -85,6 +105,7 @@ func run() (ec int) {
 	mntopt := mntopt{}
 	remote := "github.com"
 	mntpnt := ""
+	config := []string{"config.dir=:"}
 
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "usage: %s [options] [remote] mountpoint\n\n",
@@ -184,7 +205,6 @@ func run() (ec int) {
 	}
 
 	if !authonly {
-		config := []string{}
 		for _, m := range mntopt {
 			for _, s := range strings.Split(m, ",") {
 				config = append(config, s)
@@ -194,15 +214,9 @@ func run() (ec int) {
 		for _, s := range config {
 			if "debug" == s {
 				libtrace.Verbose = true
-				libtrace.Pattern = "*,github.com/billziss-gh/hubfs/*"
+				libtrace.Pattern = "*,github.com/billziss-gh/hubfs/*,github.com/billziss-gh/hubfs/fs/*"
 				break
 			}
-		}
-
-		_, err = client.SetConfig([]string{"config.dir=:"})
-		if nil != err {
-			warn("config error: %v", err)
-			return 1
 		}
 
 		config, err = client.SetConfig(config)
@@ -211,8 +225,8 @@ func run() (ec int) {
 			return 1
 		}
 
-		if !Mount(client, uri.Path, mntpnt, config) {
-			ec = 1
+		if !mount(client, uri.Path, mntpnt, config) {
+			return 1
 		}
 	}
 
