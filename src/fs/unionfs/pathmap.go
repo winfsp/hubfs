@@ -97,7 +97,7 @@ const (
 	WHITEOUT = _MASK - 2
 	NOTEXIST = _MASK - 3
 	_MAXVIS  = OPAQUE
-	_MAXIDX  = NOTEXIST - 1
+	_MAXIDX  = NOTEXIST
 )
 
 const pathmapdbg = false
@@ -586,8 +586,20 @@ func (pm *Pathmap) dumpTransaction(rdr *bufio.Reader, pofs *uint64, dmp io.Write
 		cnt = binary.LittleEndian.Uint16(k[2:])
 		copy(sum[:], k[4:])
 
+		beginStr := "BEGIN"
+		if '0' == k[0] {
+			beginStr = "CHUNK"
+		}
+		commitStr := ""
+		if 'S' == cmd {
+			commitStr = "COMMIT SET\n"
+		} else if 'A' == cmd {
+			commitStr = "COMMIT ADD\n"
+		}
+
 		fmt.Fprintf(dmp,
-			"%c%c cnt=%v hash=%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x (ofs=%08x)\n",
+			"%s (%c%c) count=%v hash=%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x (ofs=%08x)\n",
+			beginStr,
 			k[0], cmd, cnt,
 			sum[0], sum[1], sum[2], sum[3],
 			sum[4], sum[5], sum[6], sum[7],
@@ -632,7 +644,7 @@ func (pm *Pathmap) dumpTransaction(rdr *bufio.Reader, pofs *uint64, dmp io.Write
 		equ = equ && (cnt == idx && bytes.Equal(sum[:], hsh.Sum(nil)[:len(sum)]))
 
 		if equ {
-			fmt.Fprintf(dmp, "COMMIT\n\n")
+			fmt.Fprintf(dmp, "%s\n", commitStr)
 		} else {
 			fmt.Fprintf(dmp, "ABORT\n\n")
 		}
