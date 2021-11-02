@@ -29,7 +29,7 @@ func main() {
 	port.Umask(0)
 
 	args := os.Args
-	bpos := len(args)
+	bpos := 1
 	epos := len(args)
 	for i := 1; epos > i; i++ {
 		if strings.HasPrefix(args[i], "-") {
@@ -63,6 +63,7 @@ func main() {
 
 	unfs := unionfs.New(unionfs.Config{Fslist: fslist, Caseins: caseins})
 	host := fuse.NewFileSystemHost(unfs)
+	host.SetCapReaddirPlus(true)
 	if caseins {
 		host.SetCapCaseInsensitive(caseins)
 	}
