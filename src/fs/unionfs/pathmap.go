@@ -86,6 +86,7 @@ type Pathmap struct {
 	path    string                   // path map file name
 	fh      uint64                   // path map file handle
 	ofs     int64                    // path map file offset
+	dumpmap map[Pathkey]string
 }
 
 const (
@@ -100,8 +101,6 @@ const (
 )
 
 const pathmapdbg = false
-
-var pathmapdbgMap map[Pathkey]string
 
 // Function OpenPathmap opens a path map file on a file system and
 // returns its in-memory representation.
@@ -221,10 +220,10 @@ func (pm *Pathmap) Set(path string, v uint8) {
 		u = UNKNOWN
 
 		if pathmapdbg {
-			if nil == pathmapdbgMap {
-				pathmapdbgMap = make(map[Pathkey]string)
+			if nil == pm.dumpmap {
+				pm.dumpmap = make(map[Pathkey]string)
 			}
-			pathmapdbgMap[k] = path
+			pm.dumpmap[k] = path
 		}
 	}
 
@@ -627,7 +626,7 @@ func (pm *Pathmap) dumpTransaction(rdr *bufio.Reader, pofs *uint64, dmp io.Write
 				vstr = fmt.Sprint(v)
 			}
 
-			fmt.Fprintf(dmp, "- %-13s %s\n", vstr, _pathmapKtoa(k))
+			fmt.Fprintf(dmp, "- %-13s %s\n", vstr, pm.ktoa(k))
 		}
 
 		equ = equ && (cnt == idx && bytes.Equal(sum[:], hsh.Sum(nil)[:len(sum)]))
@@ -642,6 +641,27 @@ func (pm *Pathmap) dumpTransaction(rdr *bufio.Reader, pofs *uint64, dmp io.Write
 			return 1
 		}
 	}
+}
+
+func (pm *Pathmap) ktoa(k Pathkey) string {
+	if nil != pm.dumpmap {
+		q := k
+		q[0] = 0
+		if path, ok := pm.dumpmap[q]; ok {
+			return fmt.Sprintf("%02x%02x%02x%02x%02x%02x%02x%02x (%s)",
+				k[0], k[1], k[2], k[3], k[4], k[5], k[6], k[7], path)
+		}
+	}
+	return fmt.Sprintf("%02x%02x%02x%02x%02x%02x%02x%02x",
+		k[0], k[1], k[2], k[3], k[4], k[5], k[6], k[7])
+}
+
+func (pm *Pathmap) AddDumpPath(path string) {
+	k := ComputePathkey(path, pm.Caseins)
+	if nil == pm.dumpmap {
+		pm.dumpmap = make(map[Pathkey]string)
+	}
+	pm.dumpmap[k] = path
 }
 
 func _pathmapNewv(u uint8, v uint8) uint8 {
@@ -663,19 +683,6 @@ func _pathmapNewv(u uint8, v uint8) uint8 {
 	}
 
 	return dirt | v
-}
-
-func _pathmapKtoa(k Pathkey) string {
-	if nil != pathmapdbgMap {
-		q := k
-		q[0] = 0
-		if path, ok := pathmapdbgMap[q]; ok {
-			return fmt.Sprintf("%02x%02x%02x%02x%02x%02x%02x%02x (%s)",
-				k[0], k[1], k[2], k[3], k[4], k[5], k[6], k[7], path)
-		}
-	}
-	return fmt.Sprintf("%02x%02x%02x%02x%02x%02x%02x%02x",
-		k[0], k[1], k[2], k[3], k[4], k[5], k[6], k[7])
 }
 
 func _pathmapRead(rdr *bufio.Reader, rec []byte) int {
