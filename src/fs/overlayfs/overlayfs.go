@@ -18,6 +18,7 @@ import (
 	"sync"
 
 	"github.com/billziss-gh/cgofuse/fuse"
+	"github.com/billziss-gh/hubfs/fs/nullfs"
 )
 
 type filesystem struct {
@@ -27,6 +28,7 @@ type filesystem struct {
 	caseins bool
 	fsmux   sync.Mutex
 	fsmap   map[string]fuse.FileSystemInterface
+	nullfs  fuse.FileSystemInterface
 }
 
 type Config struct {
@@ -43,6 +45,7 @@ func New(c Config) fuse.FileSystemInterface {
 		newfs:   c.Newfs,
 		caseins: c.Caseins,
 		fsmap:   make(map[string]fuse.FileSystemInterface),
+		nullfs:  nullfs.New(),
 	}
 }
 
@@ -60,20 +63,25 @@ func (fs *filesystem) getfs(path string) (dstfs fuse.FileSystemInterface, remain
 	fs.fsmux.Lock()
 	dstfs = fs.fsmap[prefix]
 	if nil == dstfs {
+		expected := &dstfs
 		dstfs = fs.newfs(prefix, func() {
-			fs._delfs(prefix)
+			fs._delfs(prefix, expected)
 		})
-		fs.fsmap[prefix] = dstfs
-		dstfs.Init()
+		if nil != dstfs {
+			fs.fsmap[prefix] = dstfs
+			dstfs.Init()
+		} else {
+			dstfs = fs.nullfs
+		}
 	}
 	fs.fsmux.Unlock()
 	return
 }
 
-func (fs *filesystem) _delfs(prefix string) {
+func (fs *filesystem) _delfs(prefix string, expected *fuse.FileSystemInterface) {
 	fs.fsmux.Lock()
 	dstfs := fs.fsmap[prefix]
-	if nil != dstfs {
+	if *expected == dstfs {
 		dstfs.Destroy()
 		delete(fs.fsmap, prefix)
 	}
@@ -122,7 +130,7 @@ func (fs *filesystem) Rmdir(path string) (errc int) {
 
 func (fs *filesystem) Link(oldpath string, newpath string) (errc int) {
 	oldprefix, _ := fs.split(oldpath)
-	newprefix, newpath := fs.split(oldpath)
+	newprefix, newpath := fs.split(newpath)
 	if oldprefix != newprefix {
 		return -fuse.EXDEV
 	}
@@ -142,7 +150,7 @@ func (fs *filesystem) Readlink(path string) (errc int, target string) {
 
 func (fs *filesystem) Rename(oldpath string, newpath string) (errc int) {
 	oldprefix, _ := fs.split(oldpath)
-	newprefix, newpath := fs.split(oldpath)
+	newprefix, newpath := fs.split(newpath)
 	if oldprefix != newprefix {
 		return -fuse.EXDEV
 	}
