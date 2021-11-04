@@ -441,13 +441,21 @@ func (r *githubRepository) Name() string {
 	return r.FName
 }
 
+func (r *githubRepository) keep() bool {
+	var list []string
+	if dir := r.GetDirectory(); "" != dir {
+		list, _ = filepath.Glob(filepath.Join(dir, "files/*/.keep"))
+	}
+	return 0 != len(list)
+}
+
 func (r *githubRepository) expire(c *cache, currentTime time.Time) bool {
 	return c.expireCacheItem(&r.cacheItem, currentTime, func() {
 		if emptyRepository == r.Repository {
 			return
 		}
 
-		if r.keepdir {
+		if r.keepdir || r.keep() {
 			tracef("repo=%#v", r.FRemote)
 		} else {
 			err := r.RemoveDirectory()

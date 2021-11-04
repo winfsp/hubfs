@@ -32,6 +32,10 @@ func (*emptyRepositoryT) Close() (err error) {
 	return nil
 }
 
+func (*emptyRepositoryT) GetDirectory() string {
+	return ""
+}
+
 func (*emptyRepositoryT) SetDirectory(path string) error {
 	return nil
 }

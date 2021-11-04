@@ -89,6 +89,13 @@ func (r *gitRepository) Close() (err error) {
 	return
 }
 
+func (r *gitRepository) GetDirectory() string {
+	r.lock.Lock()
+	dir := r.dir
+	r.lock.Unlock()
+	return dir
+}
+
 func (r *gitRepository) SetDirectory(path string) (err error) {
 	r.lock.Lock()
 	if "" == r.dir {

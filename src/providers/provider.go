@@ -46,6 +46,7 @@ type Owner interface {
 
 type Repository interface {
 	io.Closer
+	GetDirectory() string
 	SetDirectory(path string) error
 	RemoveDirectory() error
 	Name() string

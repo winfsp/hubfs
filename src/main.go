@@ -86,8 +86,9 @@ func mount(client providers.Client, prefix string, mntpnt string, config []strin
 	}
 
 	fs := hubfs.New(hubfs.Config{
-		Client: client,
-		Prefix: prefix,
+		Client:  client,
+		Prefix:  prefix,
+		Overlay: true,
 	})
 	client.StartExpiration()
 	defer client.StopExpiration()
