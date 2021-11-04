@@ -71,10 +71,7 @@ func New(c Config) fuse.FileSystemInterface {
 	fs.fslist = append(fs.fslist, c.Fslist...)
 	fs.pmpath = pathutil.Join("/", c.Pmname)
 	fs.lazytick = c.Lazytick
-	_, fs.pathmap = OpenPathmap(fs.fslist[0], fs.pmpath, c.Caseins)
-	if nil == fs.pathmap {
-		return nil
-	}
+	fs.pathmap = nil // OpenPathmap uses fslist[0]; delay initialization until Init time
 	fs.filemap = NewFilemap(fs, c.Caseins)
 
 	return fs
@@ -833,6 +830,11 @@ func (fs *filesystem) invfile(path string) {
 func (fs *filesystem) Init() {
 	for _, fs := range fs.fslist {
 		fs.Init()
+	}
+
+	_, fs.pathmap = OpenPathmap(fs.fslist[0], fs.pmpath, fs.filemap.Caseins)
+	if nil == fs.pathmap {
+		_, fs.pathmap = OpenPathmap(nil, "", fs.filemap.Caseins)
 	}
 
 	if 0 != fs.lazytick {
