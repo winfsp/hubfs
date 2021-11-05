@@ -35,6 +35,8 @@ func New(c Config) fuse.FileSystemInterface {
 }
 
 func newOverlay(c Config) fuse.FileSystemInterface {
+	caseins := c.Caseins
+
 	topfs := new(c).(*hubfs)
 
 	split := func(path string) (string, string) {
@@ -83,11 +85,13 @@ func newOverlay(c Config) fuse.FileSystemInterface {
 
 		upfs := ptfs.New(root)
 		lofs := overlayfs.New(overlayfs.Config{
-			Topfs: topfs,
-			Split: readd,
+			Topfs:   topfs,
+			Split:   readd,
+			Caseins: caseins,
 		})
 		unfs := unionfs.New(unionfs.Config{
-			Fslist: []fuse.FileSystemInterface{upfs, lofs},
+			Fslist:  []fuse.FileSystemInterface{upfs, lofs},
+			Caseins: caseins,
 		})
 
 		return newShardfs(topfs, obs, unfs)
@@ -97,6 +101,7 @@ func newOverlay(c Config) fuse.FileSystemInterface {
 		Topfs:      topfs,
 		Split:      split,
 		Newfs:      newfs,
+		Caseins:    caseins,
 		TimeToLive: 1 * time.Second,
 	})
 }

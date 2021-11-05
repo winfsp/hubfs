@@ -17,6 +17,7 @@ import (
 	"bytes"
 	"io"
 	"io/ioutil"
+	"runtime"
 	"testing"
 
 	"github.com/billziss-gh/golib/keyring"
@@ -24,12 +25,13 @@ import (
 
 const remote = "https://github.com/billziss-gh/hubfs"
 const refName = "refs/heads/master"
-const entryName = "main.go"
-const subtreeName = "providers"
-const subentryName = "provider.go"
+const entryName = "README.md"
+const subtreeName = "src"
+const subentryName = "go.mod"
 const commitName = "865aad06c4ecde192460b429f810bb84c0d9ca7b"
 
 var repository Repository
+var caseins bool
 
 func TestGetRefs(t *testing.T) {
 	refs, err := repository.GetRefs()
@@ -279,7 +281,7 @@ func TestGetBlobReader(t *testing.T) {
 	}
 	content, err := ioutil.ReadAll(reader.(io.Reader))
 	reader.(io.Closer).Close()
-	if !bytes.Contains(content, []byte("package providers")) {
+	if !bytes.Contains(content, []byte("module github.com")) {
 		t.Error()
 	}
 
@@ -289,7 +291,7 @@ func TestGetBlobReader(t *testing.T) {
 	}
 	content, err = ioutil.ReadAll(reader.(io.Reader))
 	reader.(io.Closer).Close()
-	if !bytes.Contains(content, []byte("package providers")) {
+	if !bytes.Contains(content, []byte("module github.com")) {
 		t.Error()
 	}
 }
@@ -300,7 +302,7 @@ func TestGetModule(t *testing.T) {
 	const modulePath = "ext/test"
 	const moduleTarget = "/billziss-gh/secfs.test"
 
-	repository, err := NewGitRepository(remote, "")
+	repository, err := NewGitRepository(remote, "", caseins)
 	if nil != err {
 		t.Error(err)
 	}
@@ -333,12 +335,16 @@ func TestGetModule(t *testing.T) {
 
 func init() {
 	atinit(func() error {
+		if "windows" == runtime.GOOS || "darwin" == runtime.GOOS {
+			caseins = true
+		}
+
 		token, err := keyring.Get("hubfs", "https://github.com")
 		if nil != err {
 			return err
 		}
 
-		repository, err = NewGitRepository(remote, token)
+		repository, err = NewGitRepository(remote, token, caseins)
 		if nil != err {
 			return err
 		}

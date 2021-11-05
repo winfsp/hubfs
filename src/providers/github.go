@@ -82,6 +82,7 @@ type githubClient struct {
 	login      string
 	dir        string
 	keepdir    bool
+	caseins    bool
 	ttl        time.Duration
 	lock       sync.Mutex
 	cache      *cache
@@ -164,6 +165,12 @@ func (client *githubClient) SetConfig(config []string) ([]string, error) {
 		case configValue(s, "config.ttl=", &v):
 			if ttl, e := time.ParseDuration(v); nil == e && 0 < ttl {
 				client.ttl = ttl
+			}
+		case configValue(s, "config._caseins=", &v):
+			if "1" == v {
+				client.caseins = true
+			} else {
+				client.caseins = false
 			}
 		default:
 			res = append(res, s)
@@ -366,7 +373,7 @@ func (client *githubClient) OpenRepository(owner0 Owner, name string) (Repositor
 		}
 		res = item.Value.(*githubRepository)
 		if emptyRepository == res.Repository {
-			r := newGitRepository(res.FRemote, client.token)
+			r := newGitRepository(res.FRemote, client.token, client.caseins)
 			if "" != client.dir {
 				err = r.SetDirectory(filepath.Join(client.dir, owner.FName, name))
 				if nil != err {

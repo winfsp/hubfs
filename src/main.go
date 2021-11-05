@@ -19,6 +19,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/billziss-gh/cgofuse/fuse"
@@ -85,15 +86,27 @@ func mount(client providers.Client, prefix string, mntpnt string, config []strin
 		mntopt = append(mntopt, "-o"+s)
 	}
 
-	fs := hubfs.New(hubfs.Config{
-		Client:  client,
-		Prefix:  prefix,
-		Overlay: true,
-	})
+	caseins := false
+	if "windows" == runtime.GOOS || "darwin" == runtime.GOOS {
+		caseins = true
+	}
+
+	if caseins {
+		client.SetConfig([]string{"config._caseins=1"})
+	} else {
+		client.SetConfig([]string{"config._caseins=0"})
+	}
 	client.StartExpiration()
 	defer client.StopExpiration()
 
+	fs := hubfs.New(hubfs.Config{
+		Client:  client,
+		Prefix:  prefix,
+		Caseins: caseins,
+		Overlay: true,
+	})
 	host := fuse.NewFileSystemHost(fs)
+	host.SetCapCaseInsensitive(caseins)
 	host.SetCapReaddirPlus(true)
 	return host.Mount(mntpnt, mntopt)
 }

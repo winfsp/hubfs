@@ -45,6 +45,7 @@ type obstack struct {
 type Config struct {
 	Client  providers.Client
 	Prefix  string
+	Caseins bool
 	Overlay bool
 }
 

@@ -31,13 +31,14 @@ import (
 )
 
 type gitRepository struct {
-	remote string
-	token  string
-	once   sync.Once
-	repo   *git.Repository
-	lock   sync.RWMutex
-	refs   map[string]*gitRef
-	dir    string
+	remote  string
+	token   string
+	caseins bool
+	once    sync.Once
+	repo    *git.Repository
+	lock    sync.RWMutex
+	refs    map[string]*gitRef
+	dir     string
 }
 
 type gitRef struct {
@@ -55,10 +56,11 @@ type gitTreeEntry struct {
 	tree   map[string]*gitTreeEntry
 }
 
-func NewGitRepository(remote string, token string) (Repository, error) {
+func NewGitRepository(remote string, token string, caseins bool) (Repository, error) {
 	r := &gitRepository{
-		remote: remote,
-		token:  token,
+		remote:  remote,
+		token:   token,
+		caseins: caseins,
 	}
 
 	var err error
@@ -70,10 +72,11 @@ func NewGitRepository(remote string, token string) (Repository, error) {
 	return r, nil
 }
 
-func newGitRepository(remote string, token string) Repository {
+func newGitRepository(remote string, token string, caseins bool) Repository {
 	return &gitRepository{
-		remote: remote,
-		token:  token,
+		remote:  remote,
+		token:   token,
+		caseins: caseins,
 	}
 }
 
@@ -358,7 +361,12 @@ func (r *gitRepository) ensureRefs(fn func(refs map[string]*gitRef) error) error
 
 	refs := make(map[string]*gitRef, len(m))
 	for n, h := range m {
-		refs[n] = &gitRef{
+		k := n
+		if r.caseins {
+			k = strings.ToUpper(k)
+		}
+
+		refs[k] = &gitRef{
 			name:       n,
 			commitHash: h,
 		}
@@ -387,9 +395,14 @@ func (r *gitRepository) GetRefs() (res []Ref, err error) {
 }
 
 func (r *gitRepository) GetRef(name string) (res Ref, err error) {
+	k := name
+	if r.caseins {
+		k = strings.ToUpper(k)
+	}
+
 	err = r.ensureRefs(func(refs map[string]*gitRef) error {
 		var ok bool
-		res, ok = refs[name]
+		res, ok = refs[k]
 		if !ok {
 			return ErrNotFound
 		}
@@ -404,9 +417,14 @@ func (r *gitRepository) GetTempRef(name string) (res Ref, err error) {
 		return nil, ErrNotFound
 	}
 
+	k := name
+	if r.caseins {
+		k = strings.ToUpper(k)
+	}
+
 	err = r.ensureRefs(func(refs map[string]*gitRef) error {
 		var ok bool
-		res, ok = refs[name]
+		res, ok = refs[k]
 		if !ok {
 			return ErrNotFound
 		}
@@ -435,7 +453,7 @@ func (r *gitRepository) GetTempRef(name string) (res Ref, err error) {
 		commitHash: name,
 	}
 	r.lock.Lock()
-	r.refs[name] = ref
+	r.refs[k] = ref
 	r.lock.Unlock()
 
 	return ref, nil
@@ -497,7 +515,12 @@ func (r *gitRepository) ensureTree(
 			return nil
 		}
 		for _, e := range t {
-			tree[e.Name] = &gitTreeEntry{entry: *e}
+			k := e.Name
+			if r.caseins {
+				k = strings.ToUpper(k)
+			}
+
+			tree[k] = &gitTreeEntry{entry: *e}
 		}
 		return nil
 	})
@@ -582,9 +605,14 @@ func (r *gitRepository) GetTree(ref Ref, entry TreeEntry) (res []TreeEntry, err 
 }
 
 func (r *gitRepository) GetTreeEntry(ref Ref, entry TreeEntry, name string) (res TreeEntry, err error) {
+	k := name
+	if r.caseins {
+		k = strings.ToUpper(k)
+	}
+
 	err = r.ensureTree(ref, entry, func(tree map[string]*gitTreeEntry) error {
 		var ok bool
-		res, ok = tree[name]
+		res, ok = tree[k]
 		if !ok {
 			return ErrNotFound
 		}
@@ -649,7 +677,12 @@ func (r *gitRepository) ensureModules(
 		p := s["path"]
 		u := s["url"]
 		if "" != p && "" != u {
-			modules[p] = u
+			k := p
+			if r.caseins {
+				k = strings.ToUpper(k)
+			}
+
+			modules[k] = u
 		}
 	}
 
@@ -663,9 +696,14 @@ func (r *gitRepository) ensureModules(
 }
 
 func (r *gitRepository) GetModule(ref Ref, path string, rootrel bool) (res string, err error) {
+	k := path
+	if r.caseins {
+		k = strings.ToUpper(k)
+	}
+
 	err = r.ensureModules(ref, func(modules map[string]string) error {
 		var ok bool
-		res, ok = modules[path]
+		res, ok = modules[k]
 		if !ok {
 			return ErrNotFound
 		}
