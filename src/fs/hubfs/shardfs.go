@@ -177,42 +177,18 @@ func (fs *shardfs) Removexattr(path string, name string) (errc int) {
 }
 
 func (fs *shardfs) Chflags(path string, flags uint32) (errc int) {
-	intf, ok := fs.FileSystemInterface.(fuse.FileSystemChflags)
-	if !ok {
-		return -fuse.ENOSYS
-	}
-
-	errc = intf.Chflags(path, flags)
-	if 0 == errc {
-		fs.initonce()
-	}
-	return
+	/* lie! */
+	return 0
 }
 
 func (fs *shardfs) Setcrtime(path string, tmsp fuse.Timespec) (errc int) {
-	intf, ok := fs.FileSystemInterface.(fuse.FileSystemSetcrtime)
-	if !ok {
-		return -fuse.ENOSYS
-	}
-
-	errc = intf.Setcrtime(path, tmsp)
-	if 0 == errc {
-		fs.initonce()
-	}
-	return
+	/* lie! */
+	return 0
 }
 
 func (fs *shardfs) Setchgtime(path string, tmsp fuse.Timespec) (errc int) {
-	intf, ok := fs.FileSystemInterface.(fuse.FileSystemSetchgtime)
-	if !ok {
-		return -fuse.ENOSYS
-	}
-
-	errc = intf.Setchgtime(path, tmsp)
-	if 0 == errc {
-		fs.initonce()
-	}
-	return
+	/* lie! */
+	return 0
 }
 
 var _ fuse.FileSystemInterface = (*shardfs)(nil)
