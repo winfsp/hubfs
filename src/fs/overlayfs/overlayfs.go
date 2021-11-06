@@ -169,8 +169,14 @@ func (fs *filesystem) Rmdir(path string) (errc int) {
 func (fs *filesystem) Link(oldpath string, newpath string) (errc int) {
 	oldprefix, _ := fs.split(oldpath)
 	newprefix, newpath := fs.split(newpath)
-	if oldprefix != newprefix {
-		return -fuse.EXDEV
+	if fs.caseins {
+		if strings.ToUpper(oldprefix) != strings.ToUpper(newprefix) {
+			return -fuse.EXDEV
+		}
+	} else {
+		if oldprefix != newprefix {
+			return -fuse.EXDEV
+		}
 	}
 	dstfs, oldpath := fs.acquirefs(oldpath, +1)
 	defer fs.releasefs(dstfs, -1, nil)
@@ -192,8 +198,14 @@ func (fs *filesystem) Readlink(path string) (errc int, target string) {
 func (fs *filesystem) Rename(oldpath string, newpath string) (errc int) {
 	oldprefix, _ := fs.split(oldpath)
 	newprefix, newpath := fs.split(newpath)
-	if oldprefix != newprefix {
-		return -fuse.EXDEV
+	if fs.caseins {
+		if strings.ToUpper(oldprefix) != strings.ToUpper(newprefix) {
+			return -fuse.EXDEV
+		}
+	} else {
+		if oldprefix != newprefix {
+			return -fuse.EXDEV
+		}
 	}
 	dstfs, oldpath := fs.acquirefs(oldpath, +1)
 	defer fs.releasefs(dstfs, -1, nil)
