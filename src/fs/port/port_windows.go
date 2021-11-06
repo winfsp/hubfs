@@ -240,15 +240,16 @@ func Rename(oldpath string, newpath string) (errc int) {
 		}
 
 		nu16 := utf16.Encode([]rune(newpath))
-		size := int(unsafe.Offsetof(FILE_RENAME_INFO{}.FileName)) + len(nu16)*2
+		size := int(unsafe.Offsetof(FILE_RENAME_INFO{}.FileName)) + (len(nu16)+1)*2
 		buf := make([]uint8, size)
 
 		info := (*FILE_RENAME_INFO)(unsafe.Pointer(&buf[0]))
 		info.Flags = 0x43 /*REPLACE_IF_EXISTS | POSIX_SEMANTICS | IGNORE_READONLY_ATTRIBUTE*/
-		info.FileNameLength = uint32(len(nu16)) * 2
+		info.FileNameLength = uint32(len(nu16) * 2)
 
-		nbuf := (*[1 << 30]uint16)(unsafe.Pointer(&info.FileName))[:len(nu16)]
+		nbuf := (*[1 << 30]uint16)(unsafe.Pointer(&info.FileName))[:len(nu16)+1]
 		copy(nbuf, nu16)
+		nbuf[len(nu16)] = 0
 
 		r1, _, e := syscall.Syscall6(
 			setFileInformationByHandle.Addr(),
