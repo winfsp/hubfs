@@ -75,18 +75,21 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"sync"
 
 	"github.com/billziss-gh/cgofuse/fuse"
 )
 
 type Pathmap struct {
-	Caseins bool
-	vm      map[Pathkey]uint8        // visibility map
-	fs      fuse.FileSystemInterface // file system
-	path    string                   // path map file name
-	fh      uint64                   // path map file handle
-	ofs     int64                    // path map file offset
-	dumpmap map[Pathkey]string
+	sync.Mutex
+	Caseins  bool
+	vm       map[Pathkey]uint8        // visibility map
+	fs       fuse.FileSystemInterface // file system
+	path     string                   // path map file name
+	fh       uint64                   // path map file handle
+	ofs      int64                    // path map file offset
+	writemux sync.Mutex               // Write mutex
+	dumpmap  map[Pathkey]string
 }
 
 const (
@@ -371,22 +374,75 @@ func (pm *Pathmap) Write() int {
 		return -fuse.EPERM
 	}
 
-	count := int(pm.ofs / Pathkeylen)
+	pm.writemux.Lock()
+	defer pm.writemux.Unlock()
 
-	if 1024 < count && 2*len(pm.vm) < count {
-		n := pm.writeTransaction(false, pm.ofs)
+	pm.Lock()
+	ofs := pm.ofs
+	cnt := int(ofs / Pathkeylen)
+	full := 1024 < cnt && 2*len(pm.vm) < cnt
+	pm.Unlock()
+
+	if full {
+		n := pm.writeTransaction(false, ofs)
 		if 0 > n {
 			return n
 		}
 
 		return pm.writeTransaction(false, 0)
 	} else {
-		return pm.writeTransaction(true, pm.ofs)
+		return pm.writeTransaction(true, ofs)
+	}
+}
+
+func (pm *Pathmap) writeBegin(incremental bool) (vm map[Pathkey]uint8) {
+	pm.Lock()
+
+	vm = make(map[Pathkey]uint8)
+	for k, v := range pm.vm {
+		if incremental && 0 == v&_DIRT {
+			continue
+		}
+
+		switch v & _MASK {
+		case WHITEOUT, OPAQUE:
+			// insert record: add key to map
+			vm[k] = v
+		default:
+			if !incremental {
+				continue
+			}
+			// delete record: delete key from map
+			vm[k] = NOTEXIST
+		}
+
+		pm.vm[k] = v & _MASK
+	}
+
+	pm.Unlock()
+
+	return
+}
+
+func (pm *Pathmap) writeEnd(n *int, ofs *int64, vm map[Pathkey]uint8) {
+	if 0 < *n {
+		pm.Lock()
+		pm.ofs = *ofs
+		pm.Unlock()
+	} else if 0 > *n {
+		pm.Lock()
+		for k, v := range vm {
+			if 0 == v&_DIRT {
+				continue
+			}
+			pm.vm[k] |= _DIRT
+		}
+		pm.Unlock()
 	}
 }
 
 // Function writeTransaction writes a single transaction.
-func (pm *Pathmap) writeTransaction(incremental bool, ofs0 int64) int {
+func (pm *Pathmap) writeTransaction(incremental bool, ofs0 int64) (n int) {
 	truncate := !incremental && 0 == ofs0
 
 	buf := make([]byte, 4096*Pathkeylen)
@@ -414,23 +470,10 @@ func (pm *Pathmap) writeTransaction(incremental bool, ofs0 int64) int {
 		return n
 	}
 
-	for k, v := range pm.vm {
-		if incremental && 0 == v&_DIRT {
-			continue
-		}
+	vm := pm.writeBegin(incremental)
+	defer pm.writeEnd(&n, &ofs, vm)
 
-		v &= _MASK
-		switch v {
-		case WHITEOUT, OPAQUE:
-			// insert record: add key to map
-		default:
-			if !incremental {
-				continue
-			}
-			// delete record: delete key from map
-			v = NOTEXIST
-		}
-
+	for k, v := range vm {
 		if len(buf) <= ptr {
 			if n := write('P'); 0 > n {
 				return n
@@ -481,21 +524,13 @@ func (pm *Pathmap) writeTransaction(incremental bool, ofs0 int64) int {
 		}
 	}
 
-	pm.ofs = ofs
-
-	for k, v := range pm.vm {
-		if incremental && 0 == v&_DIRT {
-			continue
-		}
-
-		pm.vm[k] = v & _MASK
-	}
-
 	return 1
 }
 
 // Function Purge purges non-persistent and non-dirty entries from the path map.
 func (pm *Pathmap) Purge() {
+	pm.Lock()
+
 	for k, v := range pm.vm {
 		if 0 != v&_DIRT {
 			continue
@@ -508,6 +543,8 @@ func (pm *Pathmap) Purge() {
 			delete(pm.vm, k)
 		}
 	}
+
+	pm.Unlock()
 }
 
 // Function Dump dumps the path map file for diagnostic purposes.

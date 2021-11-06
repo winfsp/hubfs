@@ -27,16 +27,14 @@ type filesystem struct {
 	pmpath    string                     // path map file path
 	lazytick  time.Duration              // lazy writevis tick
 	nsmux     sync.RWMutex               // namespace mutex
-	pathmux   sync.Mutex                 // path map mutex
 	pathmap   *Pathmap                   // path map
 	filemux   sync.Mutex                 // open file mutex
 	filemap   *Filemap                   // open file map
-	writemux  sync.Mutex                 // writevis mutex
 	lazystopC chan struct{}              // lazy writevis stop channel
 	lazystopW *sync.WaitGroup            // lazy writevis stop waitgroup
 
 	// lock hierarchy:
-	//     nsmux -> pathmux
+	//     nsmux -> pathmap
 	//     nsmux -> filemux
 }
 
@@ -78,9 +76,9 @@ func New(c Config) fuse.FileSystemInterface {
 }
 
 func (fs *filesystem) getvis(path string, stat *fuse.Stat_t) (errc int, isopq bool, v uint8) {
-	fs.pathmux.Lock()
+	fs.pathmap.Lock()
 	isopq, v = fs.pathmap.Get(path)
-	fs.pathmux.Unlock()
+	fs.pathmap.Unlock()
 
 	if UNKNOWN == v {
 		u := NOTEXIST
@@ -96,11 +94,11 @@ func (fs *filesystem) getvis(path string, stat *fuse.Stat_t) (errc int, isopq bo
 			}
 		}
 
-		fs.pathmux.Lock()
+		fs.pathmap.Lock()
 		isopq, v = fs.pathmap.Get(path)
 		if UNKNOWN == v {
 			fs.pathmap.Set(path, u)
-			fs.pathmux.Unlock()
+			fs.pathmap.Unlock()
 			if NOTEXIST == u {
 				return -fuse.ENOENT, isopq, NOTEXIST
 			}
@@ -109,7 +107,7 @@ func (fs *filesystem) getvis(path string, stat *fuse.Stat_t) (errc int, isopq bo
 			}
 			return 0, isopq, u
 		}
-		fs.pathmux.Unlock()
+		fs.pathmap.Unlock()
 	}
 
 	switch v {
@@ -130,29 +128,26 @@ func (fs *filesystem) getvis(path string, stat *fuse.Stat_t) (errc int, isopq bo
 }
 
 func (fs *filesystem) hasvis(path string) (res bool) {
-	fs.pathmux.Lock()
+	fs.pathmap.Lock()
 	res = fs.pathmap.Has(path)
-	fs.pathmux.Unlock()
+	fs.pathmap.Unlock()
 	return
 }
 
 func (fs *filesystem) setvis(path string, v uint8) {
-	fs.pathmux.Lock()
+	fs.pathmap.Lock()
 	fs.pathmap.Set(path, v)
-	fs.pathmux.Unlock()
+	fs.pathmap.Unlock()
 }
 
 func (fs *filesystem) setvisif(path string, v uint8) {
-	fs.pathmux.Lock()
+	fs.pathmap.Lock()
 	fs.pathmap.SetIf(path, v)
-	fs.pathmux.Unlock()
+	fs.pathmap.Unlock()
 }
 
 func (fs *filesystem) writevis() (errc int) {
-	fs.writemux.Lock()
-	errc = fs.pathmap.Write()
-	fs.writemux.Unlock()
-	return
+	return fs.pathmap.Write()
 }
 
 func (fs *filesystem) _lazyWritevis() {
@@ -213,7 +208,7 @@ func (fs *filesystem) lsdir(path string,
 	}
 
 	names := make([]string, 0, len(dirmap))
-	fs.pathmux.Lock()
+	fs.pathmap.Lock()
 	for name := range dirmap {
 		if "." == name || ".." == name || pmname == name {
 			continue
@@ -224,7 +219,7 @@ func (fs *filesystem) lsdir(path string,
 		}
 		names = append(names, name)
 	}
-	fs.pathmux.Unlock()
+	fs.pathmap.Unlock()
 	sort.Strings(names)
 
 	if ^uint64(0) != fh {
