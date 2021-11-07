@@ -782,6 +782,5 @@ var (
 	getFileInformationByHandleEx = kernel32.MustFindProc("GetFileInformationByHandleEx")
 	getVolumeInformationW        = kernel32.MustFindProc("GetVolumeInformationW")
 	getVolumePathNameW           = kernel32.MustFindProc("GetVolumePathNameW")
-	moveFileExW                  = kernel32.MustFindProc("MoveFileExW")
 	setFileInformationByHandle   = kernel32.MustFindProc("SetFileInformationByHandle")
 )
