@@ -336,6 +336,44 @@ func (t *testrun) randactions(pctact int) (errc int) {
 	return
 }
 
+func (t *testrun) exercise1() (errc int) {
+	errc = t.fs.Mkdir("/dir1", 0777)
+	if 0 != errc {
+		return
+	}
+	errc, fh := t.fs.Create("/dir1/file1", fuse.O_CREAT|fuse.O_RDWR, 0666)
+	if -fuse.ENOSYS == errc {
+		errc = t.fs.Mknod("/dir1/file1", 0666, 0)
+		if 0 == errc {
+			errc, fh = t.fs.Open("/dir1/file1", fuse.O_RDWR)
+		}
+	}
+	if 0 != errc {
+		return
+	}
+	t.fs.Release("/dir1/file1", fh)
+
+	errc = t.fs.Rename("/dir1/file1", "/dir1/file2")
+	if 0 != errc {
+		return
+	}
+	errc = t.fs.Rename("/dir1", "/dir2")
+	if 0 != errc {
+		return
+	}
+
+	errc = t.fs.Unlink("/dir2/file2")
+	if 0 != errc {
+		return
+	}
+	errc = t.fs.Rmdir("/dir2")
+	if 0 != errc {
+		return
+	}
+
+	return
+}
+
 func (t *testrun) exercise(fs1, fs2, fs3 fuse.FileSystemInterface, maxcnt int, pctdir int, pctact int) (errc int) {
 	t.fs = fs1
 	errc = t.populate("/", maxcnt, pctdir, pctsym)
@@ -351,6 +389,15 @@ func (t *testrun) exercise(fs1, fs2, fs3 fuse.FileSystemInterface, maxcnt int, p
 
 	t.fs = fs3
 	errc = t.randactions(pctact)
+	if 0 != errc {
+		return
+	}
+
+	errc = t.exercise1()
+	if 0 != errc {
+		return
+	}
+	errc = t.exercise1()
 	if 0 != errc {
 		return
 	}

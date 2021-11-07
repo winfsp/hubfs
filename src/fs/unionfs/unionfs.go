@@ -129,7 +129,7 @@ func (fs *filesystem) getvis(path string, stat *fuse.Stat_t) (errc int, isopq bo
 
 func (fs *filesystem) hasvis(path string) (res bool) {
 	fs.pathmap.Lock()
-	res = fs.pathmap.Has(path)
+	_, res = fs.pathmap.TryGet(path)
 	fs.pathmap.Unlock()
 	return
 }
@@ -526,9 +526,6 @@ func (fs *filesystem) cptree(path string, v uint8, stat *fuse.Stat_t, paths *[]s
 	}
 
 	if fuse.S_IFDIR == stat.Mode&fuse.S_IFMT {
-		if 0 == v {
-			v++
-		}
 		fs.lsdir(path, false, v, ^uint64(0), func(name string, stat *fuse.Stat_t, ofst int64) bool {
 			errc = fs.cptree(pathutil.Join(path, name), uint8(ofst), stat, paths)
 			return 0 == errc
@@ -625,7 +622,7 @@ func (fs *filesystem) renode(oldpath string, newpath string, link bool, fn func(
 	defer fs.nsmux.Unlock()
 
 	var olds, news fuse.Stat_t
-	_, oldisopq, oldv := fs.getvis(oldpath, &olds)
+	_, _, oldv := fs.getvis(oldpath, &olds)
 	_, newisopq, newv := fs.getvis(newpath, &news)
 
 	switch oldv {
@@ -657,23 +654,30 @@ func (fs *filesystem) renode(oldpath string, newpath string, link bool, fn func(
 		}
 
 		paths := make([]string, 0, 128)
-
-		if !oldisopq {
-			errc = fs.cptree(oldpath, oldv, nil, &paths)
-			if 0 != errc {
-				return
-			}
+		errc = fs.cptree(oldpath, oldv, &olds, &paths)
+		if 0 != errc {
+			return
 		}
 
 		errc = fn(0)
 		if 0 == errc {
+			fs.pathmap.Lock()
 			if !link {
 				for _, path := range paths {
-					fs.setvis(path, NOTEXIST)
+					if oldpath == path {
+						continue
+					}
+					v, ok := fs.pathmap.TryGet(path)
+					if !ok {
+						continue
+					}
+					fs.pathmap.Set(path, NOTEXIST)
+					fs.pathmap.Set(newpath+path[len(oldpath):], v)
 				}
-				fs.setvis(oldpath, WHITEOUT)
+				fs.pathmap.Set(oldpath, WHITEOUT)
 			}
-			fs.setvis(newpath, 0)
+			fs.pathmap.Set(newpath, 0)
+			fs.pathmap.Unlock()
 		}
 	}
 

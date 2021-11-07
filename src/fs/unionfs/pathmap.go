@@ -75,6 +75,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"sort"
 	"sync"
 
 	"github.com/billziss-gh/cgofuse/fuse"
@@ -151,6 +152,9 @@ func (pm *Pathmap) Close() {
 
 // Function Get returns opaqueness and visibility information for a path.
 // Visibility can be one of: unknown, whiteout, notexist, 0, 1, 2, ...
+//
+// The path map lock is NOT taken; it is expected that the client will take
+// the lock appropriately when necessary.
 func (pm *Pathmap) Get(path string) (isopq bool, v uint8) {
 	var ok bool
 	pkh := NewPathkeyHash(pm.Caseins)
@@ -190,16 +194,23 @@ func (pm *Pathmap) Get(path string) (isopq bool, v uint8) {
 	return
 }
 
-// Function Has returns if visibility information exists for a path.
-func (pm *Pathmap) Has(path string) (ok bool) {
+// Function TryGet returns existence and raw visibility information for a path.
+//
+// The path map lock is NOT taken; it is expected that the client will take
+// the lock appropriately when necessary.
+func (pm *Pathmap) TryGet(path string) (v uint8, ok bool) {
 	k := ComputePathkey(path, pm.Caseins)
-	_, ok = pm.vm[k]
+	v, ok = pm.vm[k]
+	v &= _MASK
 
 	return
 }
 
 // Function IsDirty determines if a path is "dirty"
 // (i.e. it has visibility information changes that have not been written).
+//
+// The path map lock is NOT taken; it is expected that the client will take
+// the lock appropriately when necessary.
 func (pm *Pathmap) IsDirty(path string) (dirt bool) {
 	k := ComputePathkey(path, pm.Caseins)
 	v, ok := pm.vm[k]
@@ -212,6 +223,9 @@ func (pm *Pathmap) IsDirty(path string) (dirt bool) {
 
 // Function Set sets visibility information for path.
 // Visibility can be one of: opaque, whiteout, notexist, 0, 1, 2, ...
+//
+// The path map lock is NOT taken; it is expected that the client will take
+// the lock appropriately when necessary.
 func (pm *Pathmap) Set(path string, v uint8) {
 	if _MAXVIS < v {
 		panic("invalid value")
@@ -235,6 +249,9 @@ func (pm *Pathmap) Set(path string, v uint8) {
 
 // Function SetIf sets visibility information for a path only if some already exists.
 // Visibility can be one of: opaque, whiteout, notexist, 0, 1, 2, ...
+//
+// The path map lock is NOT taken; it is expected that the client will take
+// the lock appropriately when necessary.
 func (pm *Pathmap) SetIf(path string, v uint8) {
 	if _MAXVIS < v {
 		panic("invalid value")
@@ -250,6 +267,9 @@ func (pm *Pathmap) SetIf(path string, v uint8) {
 }
 
 // Function read reads the path map file and applies all transactions in it.
+//
+// The path map lock is NOT taken; this method is only used during path map
+// construction.
 func (pm *Pathmap) read() int {
 	rdr := bufio.NewReaderSize(
 		&_pathmapReader{fs: pm.fs, path: pm.path, fh: pm.fh, ofs: pm.ofs},
@@ -369,6 +389,12 @@ func (pm *Pathmap) readTransaction(rdr *bufio.Reader) int {
 }
 
 // Function Write writes the path map to the associated file on the file system.
+//
+// The path map and write locks are taken. This ensures the following:
+//
+// - If prior to using methods such as Get/Set/etc. a client is careful to take
+// the path map lock, then Write can be used safely in a concurrent manner.
+// - Only one instance of Write (per path map) can be executing at a time.
 func (pm *Pathmap) Write() int {
 	if nil == pm.fs {
 		return -fuse.EPERM
@@ -528,6 +554,11 @@ func (pm *Pathmap) writeTransaction(incremental bool, ofs0 int64) (n int) {
 }
 
 // Function Purge purges non-persistent and non-dirty entries from the path map.
+//
+// The path map lock is taken. This ensures the following:
+//
+// - If prior to using methods such as Get/Set/etc. a client is careful to take
+// the path map lock, then Purge can be used safely in a concurrent manner.
 func (pm *Pathmap) Purge() {
 	pm.Lock()
 
@@ -545,6 +576,22 @@ func (pm *Pathmap) Purge() {
 	}
 
 	pm.Unlock()
+}
+
+// Function DumpMem dumps the in-memory path map for diagnostic purposes.
+func (pm *Pathmap) DumpMem(dmp io.Writer) {
+	keys := make([]Pathkey, 0, len(pm.vm))
+	for k := range pm.vm {
+		keys = append(keys, k)
+	}
+
+	sort.Slice(keys, func(i, j int) bool {
+		return pm.ktoid(keys[i]) < pm.ktoid(keys[j])
+	})
+
+	for _, k := range keys {
+		pm.dumpkv(k, pm.vm[k], dmp)
+	}
 }
 
 // Function Dump dumps the path map file for diagnostic purposes.
@@ -661,21 +708,7 @@ func (pm *Pathmap) dumpTransaction(rdr *bufio.Reader, pofs *uint64, dmp io.Write
 			hsh.Write(k[:])
 			v := k[0] & _MASK // clear _DIRT bit used to ensure non-zero record
 
-			vstr := ""
-			switch v {
-			case UNKNOWN:
-				vstr = "unknown"
-			case OPAQUE:
-				vstr = "opaque"
-			case WHITEOUT:
-				vstr = "whiteout"
-			case NOTEXIST:
-				vstr = "notexist"
-			default:
-				vstr = fmt.Sprint(v)
-			}
-
-			fmt.Fprintf(dmp, "- %-13s %s\n", vstr, pm.ktoa(k))
+			pm.dumpkv(k, v, dmp)
 		}
 
 		equ = equ && (cnt == idx && bytes.Equal(sum[:], hsh.Sum(nil)[:len(sum)]))
@@ -692,6 +725,29 @@ func (pm *Pathmap) dumpTransaction(rdr *bufio.Reader, pofs *uint64, dmp io.Write
 	}
 }
 
+func (pm *Pathmap) dumpkv(k Pathkey, v uint8, dmp io.Writer) {
+	dstr := "-"
+	if 0 != v&_DIRT {
+		dstr = "D"
+	}
+
+	vstr := ""
+	switch v & _MASK {
+	case UNKNOWN:
+		vstr = "unknown"
+	case OPAQUE:
+		vstr = "opaque"
+	case WHITEOUT:
+		vstr = "whiteout"
+	case NOTEXIST:
+		vstr = "notexist"
+	default:
+		vstr = fmt.Sprint(v & _MASK)
+	}
+
+	fmt.Fprintf(dmp, "%s %-13s %s\n", dstr, vstr, pm.ktoa(k))
+}
+
 func (pm *Pathmap) ktoa(k Pathkey) string {
 	if nil != pm.dumpmap {
 		q := k
@@ -699,6 +755,19 @@ func (pm *Pathmap) ktoa(k Pathkey) string {
 		if path, ok := pm.dumpmap[q]; ok {
 			return fmt.Sprintf("%02x%02x%02x%02x%02x%02x%02x%02x (%s)",
 				k[0], k[1], k[2], k[3], k[4], k[5], k[6], k[7], path)
+		}
+	}
+	return fmt.Sprintf("%02x%02x%02x%02x%02x%02x%02x%02x",
+		k[0], k[1], k[2], k[3], k[4], k[5], k[6], k[7])
+}
+
+func (pm *Pathmap) ktoid(k Pathkey) string {
+	if nil != pm.dumpmap {
+		q := k
+		q[0] = 0
+		if path, ok := pm.dumpmap[q]; ok {
+			return fmt.Sprintf("(%s) %02x%02x%02x%02x%02x%02x%02x%02x",
+				path, k[0], k[1], k[2], k[3], k[4], k[5], k[6], k[7])
 		}
 	}
 	return fmt.Sprintf("%02x%02x%02x%02x%02x%02x%02x%02x",
