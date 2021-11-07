@@ -578,6 +578,15 @@ func (pm *Pathmap) Purge() {
 	pm.Unlock()
 }
 
+// Function AddDumpPath adds a "known" path for diagnostic purposes.
+func (pm *Pathmap) AddDumpPath(path string) {
+	k := ComputePathkey(path, pm.Caseins)
+	if nil == pm.dumpmap {
+		pm.dumpmap = make(map[Pathkey]string)
+	}
+	pm.dumpmap[k] = path
+}
+
 // Function DumpMem dumps the in-memory path map for diagnostic purposes.
 func (pm *Pathmap) DumpMem(dmp io.Writer) {
 	keys := make([]Pathkey, 0, len(pm.vm))
@@ -772,14 +781,6 @@ func (pm *Pathmap) ktoid(k Pathkey) string {
 	}
 	return fmt.Sprintf("%02x%02x%02x%02x%02x%02x%02x%02x",
 		k[0], k[1], k[2], k[3], k[4], k[5], k[6], k[7])
-}
-
-func (pm *Pathmap) AddDumpPath(path string) {
-	k := ComputePathkey(path, pm.Caseins)
-	if nil == pm.dumpmap {
-		pm.dumpmap = make(map[Pathkey]string)
-	}
-	pm.dumpmap[k] = path
 }
 
 func _pathmapNewv(u uint8, v uint8) uint8 {
