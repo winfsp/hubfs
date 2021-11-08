@@ -165,7 +165,7 @@ func TestPathmapWriteIncremental(t *testing.T) {
 		t.Error()
 	}
 
-	n := pm.Write()
+	n := pm.Write(false)
 	if 0 > n {
 		t.Error()
 	}
@@ -188,7 +188,7 @@ func TestPathmapWriteIncremental(t *testing.T) {
 	}
 	pm2.Close()
 
-	n = pm.Write()
+	n = pm.Write(false)
 	if 0 > n {
 		t.Error()
 	}
@@ -233,7 +233,7 @@ func TestPathmapWriteIncremental(t *testing.T) {
 		t.Error()
 	}
 
-	n = pm.Write()
+	n = pm.Write(false)
 	if 0 > n {
 		t.Error()
 	}
@@ -279,7 +279,7 @@ func TestPathmapWriteIncremental(t *testing.T) {
 		t.Error()
 	}
 
-	n = pm.Write()
+	n = pm.Write(false)
 	if 0 > n {
 		t.Error()
 	}
@@ -332,7 +332,7 @@ func TestPathmapWriteIncremental(t *testing.T) {
 		t.Error()
 	}
 
-	n = pm.Write()
+	n = pm.Write(false)
 	if 0 > n {
 		t.Error()
 	}
@@ -385,7 +385,7 @@ func TestPathmapWrite(t *testing.T) {
 		}
 
 		if 0 == (i+1)%(N/10) {
-			n := pm.Write()
+			n := pm.Write(false)
 			if 0 > n {
 				t.Error()
 			}
@@ -411,7 +411,7 @@ func TestPathmapWrite(t *testing.T) {
 		}
 
 		if 0 == (i+1)%(N/10) {
-			n := pm.Write()
+			n := pm.Write(false)
 			if 0 > n {
 				t.Error()
 			}
@@ -437,7 +437,7 @@ func TestPathmapWrite(t *testing.T) {
 		}
 
 		if 0 == (i+1)%(N/2) {
-			n := pm.Write()
+			n := pm.Write(false)
 			if 0 > n {
 				t.Error()
 			}
@@ -489,7 +489,7 @@ func TestPathmapPurge(t *testing.T) {
 		t.Error()
 	}
 
-	n := pm.Write()
+	n := pm.Write(false)
 	if 0 > n {
 		t.Error()
 	}

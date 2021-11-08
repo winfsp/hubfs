@@ -85,6 +85,7 @@ type Pathmap struct {
 	sync.Mutex
 	Caseins  bool
 	vm       map[Pathkey]uint8        // visibility map
+	dl       []Pathkey                // dirty list
 	fs       fuse.FileSystemInterface // file system
 	path     string                   // path map file name
 	fh       uint64                   // path map file handle
@@ -244,7 +245,7 @@ func (pm *Pathmap) Set(path string, v uint8) {
 		}
 	}
 
-	pm.vm[k] = _pathmapNewv(u, v)
+	pm.set(k, u, v)
 }
 
 // Function SetIf sets visibility information for a path only if some already exists.
@@ -263,7 +264,31 @@ func (pm *Pathmap) SetIf(path string, v uint8) {
 		return
 	}
 
-	pm.vm[k] = _pathmapNewv(u, v)
+	pm.set(k, u, v)
+}
+
+func (pm *Pathmap) set(k Pathkey, u uint8, v uint8) {
+	dirt := u & _DIRT
+	if 0 == dirt {
+		// Set _DIRT bit if visibility "kind" changes.
+		// Kind is one of: unknown/"index", opaque, whiteout, notexist
+		ukind := u & _MASK
+		vkind := v & _MASK
+		if _MAXIDX >= ukind {
+			ukind = UNKNOWN
+		}
+		if _MAXIDX >= vkind {
+			vkind = UNKNOWN
+		}
+		if ukind != vkind {
+			dirt = _DIRT
+		}
+	}
+
+	pm.vm[k] = dirt | v
+	if u&_DIRT != dirt {
+		pm.dl = append(pm.dl, k)
+	}
 }
 
 // Function read reads the path map file and applies all transactions in it.
@@ -395,7 +420,7 @@ func (pm *Pathmap) readTransaction(rdr *bufio.Reader) int {
 // - If prior to using methods such as Get/Set/etc. a client is careful to take
 // the path map lock, then Write can be used safely in a concurrent manner.
 // - Only one instance of Write (per path map) can be executing at a time.
-func (pm *Pathmap) Write() int {
+func (pm *Pathmap) Write(sync bool) int {
 	if nil == pm.fs {
 		return -fuse.EPERM
 	}
@@ -410,40 +435,52 @@ func (pm *Pathmap) Write() int {
 	pm.Unlock()
 
 	if full {
-		n := pm.writeTransaction(false, ofs)
+		n := pm.writeTransaction(false, ofs, sync)
 		if 0 > n {
 			return n
 		}
 
-		return pm.writeTransaction(false, 0)
+		return pm.writeTransaction(false, 0, sync)
 	} else {
-		return pm.writeTransaction(true, ofs)
+		return pm.writeTransaction(true, ofs, sync)
 	}
 }
 
 func (pm *Pathmap) writeBegin(incremental bool) (vm map[Pathkey]uint8) {
 	pm.Lock()
 
-	vm = make(map[Pathkey]uint8)
-	for k, v := range pm.vm {
-		if incremental && 0 == v&_DIRT {
-			continue
-		}
+	if incremental {
+		vm = make(map[Pathkey]uint8, len(pm.dl))
 
-		switch v & _MASK {
-		case WHITEOUT, OPAQUE:
-			// insert record: add key to map
-			vm[k] = v
-		default:
-			if !incremental {
-				continue
+		for _, k := range pm.dl {
+			v := pm.vm[k]
+
+			switch v & _MASK {
+			case WHITEOUT, OPAQUE:
+				// insert record: add key to map
+				vm[k] = v
+			default:
+				// delete record: delete key from map
+				vm[k] = NOTEXIST
 			}
-			// delete record: delete key from map
-			vm[k] = NOTEXIST
-		}
 
-		pm.vm[k] = v & _MASK
+			pm.vm[k] = v & _MASK
+		}
+	} else {
+		vm = make(map[Pathkey]uint8, len(pm.vm))
+
+		for k, v := range pm.vm {
+			switch v & _MASK {
+			case WHITEOUT, OPAQUE:
+				// insert record: add key to map
+				vm[k] = v
+			}
+
+			pm.vm[k] = v & _MASK
+		}
 	}
+
+	pm.dl = nil
 
 	pm.Unlock()
 
@@ -453,22 +490,31 @@ func (pm *Pathmap) writeBegin(incremental bool) (vm map[Pathkey]uint8) {
 func (pm *Pathmap) writeEnd(n *int, ofs *int64, vm map[Pathkey]uint8) {
 	if 0 < *n {
 		pm.Lock()
+
 		pm.ofs = *ofs
+
 		pm.Unlock()
 	} else if 0 > *n {
 		pm.Lock()
+
 		for k, v := range vm {
 			if 0 == v&_DIRT {
 				continue
 			}
-			pm.vm[k] |= _DIRT
+			v = pm.vm[k]
+			if 0 != v&_DIRT {
+				continue
+			}
+			pm.vm[k] = _DIRT | v
+			pm.dl = append(pm.dl, k)
 		}
+
 		pm.Unlock()
 	}
 }
 
 // Function writeTransaction writes a single transaction.
-func (pm *Pathmap) writeTransaction(incremental bool, ofs0 int64) (n int) {
+func (pm *Pathmap) writeTransaction(incremental bool, ofs0 int64, sync bool) (n int) {
 	truncate := !incremental && 0 == ofs0
 
 	buf := make([]byte, 4096*Pathkeylen)
@@ -533,9 +579,11 @@ func (pm *Pathmap) writeTransaction(incremental bool, ofs0 int64) (n int) {
 		return 0
 	}
 
-	errc := pm.fs.Fsync(pm.path, true, pm.fh)
-	if 0 != errc && -fuse.ENOSYS != errc {
-		return errc
+	if sync {
+		errc := pm.fs.Fsync(pm.path, true, pm.fh)
+		if 0 != errc && -fuse.ENOSYS != errc {
+			return errc
+		}
 	}
 
 	if truncate {
@@ -544,13 +592,25 @@ func (pm *Pathmap) writeTransaction(incremental bool, ofs0 int64) (n int) {
 			return errc
 		}
 
-		errc = pm.fs.Fsync(pm.path, true, pm.fh)
-		if 0 != errc && -fuse.ENOSYS != errc {
-			return errc
+		if sync {
+			errc = pm.fs.Fsync(pm.path, true, pm.fh)
+			if 0 != errc && -fuse.ENOSYS != errc {
+				return errc
+			}
 		}
 	}
 
 	return 1
+}
+
+// Function Sync performs an Fsync on the path map file.
+func (pm *Pathmap) Sync() int {
+	errc := pm.fs.Fsync(pm.path, true, pm.fh)
+	if 0 != errc && -fuse.ENOSYS != errc {
+		return errc
+	}
+
+	return 0
 }
 
 // Function Purge purges non-persistent and non-dirty entries from the path map.
@@ -781,27 +841,6 @@ func (pm *Pathmap) ktoid(k Pathkey) string {
 	}
 	return fmt.Sprintf("%02x%02x%02x%02x%02x%02x%02x%02x",
 		k[0], k[1], k[2], k[3], k[4], k[5], k[6], k[7])
-}
-
-func _pathmapNewv(u uint8, v uint8) uint8 {
-	dirt := u & _DIRT
-	if 0 == dirt {
-		// Set _DIRT bit if visibility "kind" changes.
-		// Kind is one of: unknown/"index", opaque, whiteout, notexist
-		ukind := u & _MASK
-		vkind := v & _MASK
-		if _MAXIDX >= ukind {
-			ukind = UNKNOWN
-		}
-		if _MAXIDX >= vkind {
-			vkind = UNKNOWN
-		}
-		if ukind != vkind {
-			dirt = _DIRT
-		}
-	}
-
-	return dirt | v
 }
 
 func _pathmapRead(rdr *bufio.Reader, rec []byte) int {

@@ -607,10 +607,12 @@ func TestUnionfs(t *testing.T) {
 	seed := time.Now().UnixNano()
 	fmt.Println("seed =", seed)
 
+	lazytick := 0 * time.Second
+
 	cfs := newTestfs()
 	fs1 := newTestfs()
 	fs2 := newTestfs()
-	ufs := New(Config{Fslist: []fuse.FileSystemInterface{fs1, fs2}})
+	ufs := New(Config{Fslist: []fuse.FileSystemInterface{fs1, fs2}, Lazytick: lazytick})
 	ufs.Init()
 	defer ufs.Destroy()
 

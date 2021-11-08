@@ -25,6 +25,7 @@ import (
 type filesystem struct {
 	fslist    []fuse.FileSystemInterface // file system list
 	pmpath    string                     // path map file path
+	pmsync    bool                       // perform path map file sync
 	lazytick  time.Duration              // lazy writevis tick
 	nsmux     sync.RWMutex               // namespace mutex
 	pathmap   *Pathmap                   // path map
@@ -48,6 +49,7 @@ type file struct {
 type Config struct {
 	Fslist   []fuse.FileSystemInterface
 	Pmname   string
+	Pmsync   bool
 	Lazytick time.Duration
 	Caseins  bool
 }
@@ -59,15 +61,11 @@ func New(c Config) fuse.FileSystemInterface {
 	if "" == c.Pmname {
 		c.Pmname = ".unionfs"
 	}
-	if 0 > c.Lazytick {
-		c.Lazytick = 0
-	} else if 0 == c.Lazytick {
-		c.Lazytick = 10 * time.Second
-	}
 
 	fs := &filesystem{}
 	fs.fslist = append(fs.fslist, c.Fslist...)
 	fs.pmpath = pathutil.Join("/", c.Pmname)
+	fs.pmsync = c.Pmsync
 	fs.lazytick = c.Lazytick
 	fs.pathmap = nil // OpenPathmap uses fslist[0]; delay initialization until Init time
 	fs.filemap = NewFilemap(fs, c.Caseins)
@@ -147,7 +145,14 @@ func (fs *filesystem) setvisif(path string, v uint8) {
 }
 
 func (fs *filesystem) writevis() (errc int) {
-	return fs.pathmap.Write()
+	return fs.pathmap.Write(fs.pmsync)
+}
+
+func (fs *filesystem) condwritevis(cond *bool) (errc int) {
+	if *cond && 0 == fs.lazytick {
+		errc = fs.writevis()
+	}
+	return
 }
 
 func (fs *filesystem) _lazyWritevis() {
@@ -544,6 +549,9 @@ func (fs *filesystem) mknode(path string, isdir bool, fn func(v uint8) int) (err
 		return -fuse.EPERM
 	}
 
+	var cond bool
+	defer fs.condwritevis(&cond)
+
 	fs.nsmux.Lock()
 	defer fs.nsmux.Unlock()
 
@@ -551,6 +559,8 @@ func (fs *filesystem) mknode(path string, isdir bool, fn func(v uint8) int) (err
 
 	switch v {
 	case NOTEXIST, WHITEOUT:
+		cond = true
+
 		errc = fs.mkpdir(path)
 		if 0 != errc {
 			return
@@ -576,6 +586,9 @@ func (fs *filesystem) rmnode(path string, isdir bool, fn func(v uint8) int) (err
 		return -fuse.EPERM
 	}
 
+	var cond bool
+	defer fs.condwritevis(&cond)
+
 	fs.nsmux.Lock()
 	defer fs.nsmux.Unlock()
 
@@ -600,6 +613,8 @@ func (fs *filesystem) rmnode(path string, isdir bool, fn func(v uint8) int) (err
 			}
 		}
 
+		cond = true
+
 		if 0 == v {
 			errc = fn(0)
 			if 0 == errc {
@@ -617,6 +632,9 @@ func (fs *filesystem) renode(oldpath string, newpath string, link bool, fn func(
 	if hasPathPrefix(oldpath, fs.pmpath) || hasPathPrefix(newpath, fs.pmpath) {
 		return -fuse.EPERM
 	}
+
+	var cond bool
+	defer fs.condwritevis(&cond)
 
 	fs.nsmux.Lock()
 	defer fs.nsmux.Unlock()
@@ -652,6 +670,8 @@ func (fs *filesystem) renode(oldpath string, newpath string, link bool, fn func(
 				}
 			}
 		}
+
+		cond = true
 
 		paths := make([]string, 0, 128)
 		errc = fs.cptree(oldpath, oldv, &olds, &paths)
@@ -709,6 +729,9 @@ func (fs *filesystem) setnode(path string, fn func(v uint8) int) (errc int) {
 		return -fuse.EPERM
 	}
 
+	var cond bool
+	defer fs.condwritevis(&cond)
+
 	fs.nsmux.Lock()
 	defer fs.nsmux.Unlock()
 
@@ -721,6 +744,8 @@ func (fs *filesystem) setnode(path string, fn func(v uint8) int) (errc int) {
 	case 0:
 		errc = fn(0)
 	default:
+		cond = true
+
 		errc = fs.cpany(path, v, &s)
 		if 0 != errc {
 			return
@@ -749,6 +774,9 @@ func (fs *filesystem) CopyFile(path string, f0 interface{}) bool {
 	fs.nsmux.Lock()
 	fs.cpfile(path, v, nil, fh)
 	fs.nsmux.Unlock()
+
+	var cond = true
+	fs.condwritevis(&cond)
 
 	fs.filemux.Lock()
 
