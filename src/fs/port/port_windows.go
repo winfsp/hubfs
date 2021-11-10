@@ -340,6 +340,12 @@ func UtimesNano(path string, tmsp []fuse.Timespec) (errc int) {
 		if zero != tmsp[1] {
 			copyFileTimeU64FromFuseTimespec(&info.LastWriteTime, tmsp[1])
 		}
+		if 3 <= len(tmsp) && zero != tmsp[2] {
+			copyFileTimeU64FromFuseTimespec(&info.ChangeTime, tmsp[3])
+		}
+		if 4 <= len(tmsp) && zero != tmsp[3] {
+			copyFileTimeU64FromFuseTimespec(&info.CreationTime, tmsp[3])
+		}
 
 		errc = setBasicInfo(fh, &info)
 

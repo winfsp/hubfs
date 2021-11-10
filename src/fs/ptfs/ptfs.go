@@ -185,6 +185,13 @@ func (self *filesystem) Chflags(path string, flags uint32) (errc int) {
 	return port.Lchflags(path, flags)
 }
 
+func (self *filesystem) Setcrtime(path string, tmsp fuse.Timespec) (errc int) {
+	path = filepath.Join(self.root, path)
+	arts := [4]fuse.Timespec{}
+	arts[3] = tmsp
+	return port.UtimesNano(path, arts[:])
+}
+
 func New(root string) fuse.FileSystemInterface {
 	return &filesystem{root: root}
 }
