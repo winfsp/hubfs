@@ -180,6 +180,11 @@ func (self *filesystem) Releasedir(path string, fh uint64) (errc int) {
 	return port.Closedir(fh)
 }
 
+func (self *filesystem) Chflags(path string, flags uint32) (errc int) {
+	path = filepath.Join(self.root, path)
+	return port.Lchflags(path, flags)
+}
+
 func New(root string) fuse.FileSystemInterface {
 	return &filesystem{root: root}
 }

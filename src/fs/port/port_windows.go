@@ -293,49 +293,46 @@ func Chmod(path string, mode uint32) (errc int) {
 }
 
 func Fchmod(fh uint64, mode uint32) (errc int) {
-	type FILE_BASIC_INFO struct {
-		CreationTime   uint64
-		LastAccessTime uint64
-		LastWriteTime  uint64
-		ChangeTime     uint64
-		FileAttributes uint32
+	info := _FILE_BASIC_INFO{}
+	errc = getBasicInfo(fh, &info)
+	if 0 == errc {
+		attr := ^uint32(0x2000) /*FILE_ATTRIBUTE_NOT_CONTENT_INDEXED*/ & info.FileAttributes
+		info = _FILE_BASIC_INFO{}
+		info.FileAttributes = mapModeToFileAttributes(mode, attr)
+
+		errc = setBasicInfo(fh, &info)
 	}
 
-	info := FILE_BASIC_INFO{}
-	info.FileAttributes = mapModeToFileAttributes(mode)
-
-	r1, _, e := syscall.Syscall6(
-		setFileInformationByHandle.Addr(),
-		4,
-		uintptr(fh),
-		0, /*FileBasicInfo*/
-		uintptr(unsafe.Pointer(&info)),
-		unsafe.Sizeof(info),
-		0,
-		0)
-	if 0 == r1 {
-		return Errno(e)
-	}
-
-	return 0
+	return
 }
 
 func Lchown(path string, uid int, gid int) (errc int) {
 	return -fuse.ENOSYS
 }
 
+func Lchflags(path string, flags uint32) (errc int) {
+	errc, fh := open(path, syscall.FILE_WRITE_ATTRIBUTES, syscall.OPEN_EXISTING, 0)
+	if 0 == errc {
+		info := _FILE_BASIC_INFO{}
+		errc = getBasicInfo(fh, &info)
+		if 0 == errc {
+			attr := 0x2000 /*FILE_ATTRIBUTE_NOT_CONTENT_INDEXED*/ & info.FileAttributes
+			info = _FILE_BASIC_INFO{}
+			info.FileAttributes = mapFlagsToFileAttributes(flags, attr)
+
+			errc = setBasicInfo(fh, &info)
+		}
+
+		close(fh)
+	}
+
+	return
+}
+
 func UtimesNano(path string, tmsp []fuse.Timespec) (errc int) {
 	errc, fh := open(path, syscall.FILE_WRITE_ATTRIBUTES, syscall.OPEN_EXISTING, 0)
 	if 0 == errc {
-		type FILE_BASIC_INFO struct {
-			CreationTime   uint64
-			LastAccessTime uint64
-			LastWriteTime  uint64
-			ChangeTime     uint64
-			FileAttributes uint32
-		}
-
-		info := FILE_BASIC_INFO{}
+		info := _FILE_BASIC_INFO{}
 		zero := fuse.Timespec{}
 		if zero != tmsp[0] {
 			copyFileTimeU64FromFuseTimespec(&info.LastAccessTime, tmsp[0])
@@ -344,18 +341,7 @@ func UtimesNano(path string, tmsp []fuse.Timespec) (errc int) {
 			copyFileTimeU64FromFuseTimespec(&info.LastWriteTime, tmsp[1])
 		}
 
-		r1, _, e := syscall.Syscall6(
-			setFileInformationByHandle.Addr(),
-			4,
-			uintptr(fh),
-			0, /*FileBasicInfo*/
-			uintptr(unsafe.Pointer(&info)),
-			unsafe.Sizeof(info),
-			0,
-			0)
-		if 0 == r1 {
-			return Errno(e)
-		}
+		errc = setBasicInfo(fh, &info)
 
 		close(fh)
 	}
@@ -380,7 +366,7 @@ func Open(path string, flags int, mode uint32) (errc int, fh uint64) {
 	switch flags & (fuse.O_CREAT) {
 	case fuse.O_CREAT:
 		CreateDisposition = syscall.CREATE_NEW
-		FileAttributes = mapModeToFileAttributes(mode)
+		FileAttributes = mapModeToFileAttributes(mode, 0)
 	}
 
 	errc, fh = open(path, DesiredAccess, CreateDisposition, FileAttributes)
@@ -417,6 +403,7 @@ func Fstat(fh uint64, stat *fuse.Stat_t) (errc int) {
 	copyFuseTimespecFromFileTime(&stat.Atim, &info.LastAccessTime)
 	copyFuseTimespecFromFileTime(&stat.Mtim, &info.LastWriteTime)
 	copyFuseTimespecFromFileTime(&stat.Ctim, &info.LastWriteTime)
+	stat.Flags = mapFileAttributesToFlags(info.FileAttributes)
 
 	return 0
 }
@@ -555,6 +542,7 @@ func Readdir(fh uint64, fill func(name string, stat *fuse.Stat_t, ofst int64) bo
 			copyFuseTimespecFromFileTimeU64(&stat.Atim, info.LastAccessTime)
 			copyFuseTimespecFromFileTimeU64(&stat.Mtim, info.LastWriteTime)
 			copyFuseTimespecFromFileTimeU64(&stat.Ctim, info.LastWriteTime)
+			stat.Flags = mapFileAttributesToFlags(info.FileAttributes)
 
 			if !fill(name, &stat, 0) {
 				return 0
@@ -718,6 +706,40 @@ func close(fh uint64) (errc int) {
 	return Errno(syscall.CloseHandle(syscall.Handle(fh)))
 }
 
+func getBasicInfo(fh uint64, info *_FILE_BASIC_INFO) (errc int) {
+	r1, _, e := syscall.Syscall6(
+		getFileInformationByHandleEx.Addr(),
+		4,
+		uintptr(fh),
+		0, /*FileBasicInfo*/
+		uintptr(unsafe.Pointer(info)),
+		unsafe.Sizeof(*info),
+		0,
+		0)
+	if 0 == r1 {
+		return Errno(e)
+	}
+
+	return 0
+}
+
+func setBasicInfo(fh uint64, info *_FILE_BASIC_INFO) (errc int) {
+	r1, _, e := syscall.Syscall6(
+		setFileInformationByHandle.Addr(),
+		4,
+		uintptr(fh),
+		0, /*FileBasicInfo*/
+		uintptr(unsafe.Pointer(info)),
+		unsafe.Sizeof(*info),
+		0,
+		0)
+	if 0 == r1 {
+		return Errno(e)
+	}
+
+	return 0
+}
+
 func copyFuseTimespecFromFileTime(dst *fuse.Timespec, src *syscall.Filetime) {
 	dst.Nsec = src.Nanoseconds()
 	dst.Sec, dst.Nsec = dst.Nsec/1000000000, dst.Nsec%1000000000
@@ -743,10 +765,7 @@ func mapFileAttributesToMode(attr uint32) (mode uint32) {
 	} else if 0 != attr&syscall.FILE_ATTRIBUTE_DIRECTORY {
 		mode = 0777 | fuse.S_IFDIR
 	} else {
-		mode = 0444 | fuse.S_IFREG
-		if 0 == attr&syscall.FILE_ATTRIBUTE_READONLY {
-			mode |= 0222
-		}
+		mode = 0666 | fuse.S_IFREG
 		if 0 == attr&0x2000 /*FILE_ATTRIBUTE_NOT_CONTENT_INDEXED*/ {
 			/* abuse FILE_ATTRIBUTE_NOT_CONTENT_INDEXED to store the NOT executable condition */
 			mode |= 0111
@@ -756,10 +775,8 @@ func mapFileAttributesToMode(attr uint32) (mode uint32) {
 	return
 }
 
-func mapModeToFileAttributes(mode uint32) (attr uint32) {
-	if 0 == mode&0200 {
-		attr |= syscall.FILE_ATTRIBUTE_READONLY
-	}
+func mapModeToFileAttributes(mode uint32, extra uint32) (attr uint32) {
+	attr = extra
 	if 0 == mode&0100 {
 		/* abuse FILE_ATTRIBUTE_NOT_CONTENT_INDEXED to store the NOT executable condition */
 		attr |= 0x2000 /*FILE_ATTRIBUTE_NOT_CONTENT_INDEXED*/
@@ -771,9 +788,55 @@ func mapModeToFileAttributes(mode uint32) (attr uint32) {
 	return
 }
 
+func mapFileAttributesToFlags(attr uint32) (flags uint32) {
+	if 0 != attr&syscall.FILE_ATTRIBUTE_ARCHIVE {
+		flags |= fuse.UF_ARCHIVE
+	}
+	if 0 != attr&syscall.FILE_ATTRIBUTE_HIDDEN {
+		flags |= fuse.UF_HIDDEN
+	}
+	if 0 != attr&syscall.FILE_ATTRIBUTE_READONLY {
+		flags |= fuse.UF_READONLY
+	}
+	if 0 != attr&syscall.FILE_ATTRIBUTE_SYSTEM {
+		flags |= fuse.UF_SYSTEM
+	}
+
+	return
+}
+
+func mapFlagsToFileAttributes(flags uint32, extra uint32) (attr uint32) {
+	attr = extra
+	if 0 != flags&fuse.UF_ARCHIVE {
+		attr |= syscall.FILE_ATTRIBUTE_ARCHIVE
+	}
+	if 0 != flags&fuse.UF_HIDDEN {
+		attr |= syscall.FILE_ATTRIBUTE_HIDDEN
+	}
+	if 0 != flags&fuse.UF_READONLY {
+		attr |= syscall.FILE_ATTRIBUTE_READONLY
+	}
+	if 0 != flags&fuse.UF_SYSTEM {
+		attr |= syscall.FILE_ATTRIBUTE_SYSTEM
+	}
+	if 0 == attr {
+		attr = syscall.FILE_ATTRIBUTE_NORMAL
+	}
+
+	return
+}
+
 func Setuidgid() func() {
 	return func() {
 	}
+}
+
+type _FILE_BASIC_INFO struct {
+	CreationTime   uint64
+	LastAccessTime uint64
+	LastWriteTime  uint64
+	ChangeTime     uint64
+	FileAttributes uint32
 }
 
 var (

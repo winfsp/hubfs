@@ -80,6 +80,10 @@ func Lchown(path string, uid int, gid int) (errc int) {
 	return Errno(syscall.Lchown(path, uid, gid))
 }
 
+func Lchflags(path string, flags uint32) (errc int) {
+	return -fuse.ENOSYS
+}
+
 func UtimesNano(path string, tmsp []fuse.Timespec) (errc int) {
 	gots := [2]syscall.Timespec{}
 	gots[0].Sec, gots[0].Nsec = tmsp[0].Sec, tmsp[0].Nsec
