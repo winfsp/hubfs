@@ -193,7 +193,7 @@ func (t *testrun) move(path string) (errc int) {
 			}
 		}
 	}()
-	for i := sort.SearchStrings(t.paths, path); len(t.paths) > i && hasPathPrefix(t.paths[i], path); i++ {
+	for i := sort.SearchStrings(t.paths, path); len(t.paths) > i && hasPathPrefix(t.paths[i], path, false); i++ {
 		e, file := testOpenFile(t.fs, t.paths[i])
 		if 0 != e {
 			errc = e
@@ -216,7 +216,7 @@ func (t *testrun) move(path string) (errc int) {
 	if i := sort.SearchStrings(t.paths, newpath); len(t.paths) > i && t.paths[i] == newpath {
 		t.paths = append(t.paths[:i], t.paths[i+1:]...)
 	}
-	for i := sort.SearchStrings(t.paths, path); len(t.paths) > i && hasPathPrefix(t.paths[i], path); i++ {
+	for i := sort.SearchStrings(t.paths, path); len(t.paths) > i && hasPathPrefix(t.paths[i], path, false); i++ {
 		t.paths[i] = newpath + t.paths[i][len(path):]
 	}
 	sort.Strings(t.paths)
