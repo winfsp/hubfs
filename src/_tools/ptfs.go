@@ -37,11 +37,14 @@ func main() {
 		root = "."
 	}
 
+	caseins := false
+	if "windows" == runtime.GOOS || "darwin" == runtime.GOOS {
+		caseins = true
+	}
+
 	ptfs := ptfs.New(root)
 	host := fuse.NewFileSystemHost(ptfs)
-	if "windows" == runtime.GOOS {
-		host.SetCapCaseInsensitive(true)
-		host.SetCapReaddirPlus(true)
-	}
+	host.SetCapReaddirPlus(true)
+	host.SetCapCaseInsensitive(caseins)
 	host.Mount("", args[1:])
 }

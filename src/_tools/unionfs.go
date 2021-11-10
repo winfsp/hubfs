@@ -64,8 +64,6 @@ func main() {
 	unfs := unionfs.New(unionfs.Config{Fslist: fslist, Caseins: caseins})
 	host := fuse.NewFileSystemHost(unfs)
 	host.SetCapReaddirPlus(true)
-	if caseins {
-		host.SetCapCaseInsensitive(caseins)
-	}
+	host.SetCapCaseInsensitive(caseins)
 	host.Mount("", args[1:])
 }
