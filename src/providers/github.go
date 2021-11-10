@@ -375,7 +375,7 @@ func (client *githubClient) OpenRepository(owner0 Owner, name string) (Repositor
 		if emptyRepository == res.Repository {
 			r := newGitRepository(res.FRemote, client.token, client.caseins)
 			if "" != client.dir {
-				err = r.SetDirectory(filepath.Join(client.dir, owner.FName, name))
+				err = r.SetDirectory(filepath.Join(client.dir, owner.FName, res.FName))
 				if nil != err {
 					return err
 				}

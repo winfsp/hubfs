@@ -57,10 +57,11 @@ func new(c Config) fuse.FileSystemInterface {
 	}
 }
 
-func (fs *hubfs) open(path string) (errc int, res *obstack) {
+func (fs *hubfs) openex(path string, norm bool) (errc int, res *obstack, lst []string) {
+	lst = split(pathutil.Join(fs.prefix, path))
 	obs := &obstack{}
 	var err error
-	for i, c := range split(pathutil.Join(fs.prefix, path)) {
+	for i, c := range lst {
 		switch i {
 		case 0:
 			// We disallow some names to speed up operations:
@@ -71,9 +72,15 @@ func (fs *hubfs) open(path string) (errc int, res *obstack) {
 				obs.owner, err = nil, providers.ErrNotFound
 			} else {
 				obs.owner, err = fs.client.OpenOwner(c)
+				if norm && nil == err {
+					lst[i] = obs.owner.Name()
+				}
 			}
 		case 1:
 			obs.repository, err = fs.client.OpenRepository(obs.owner, c)
+			if norm && nil == err {
+				lst[i] = obs.repository.Name()
+			}
 		case 2:
 			c = strings.ReplaceAll(c, " ", "/")
 			obs.ref, err = obs.repository.GetRef("refs/heads/" + c)
@@ -83,8 +90,23 @@ func (fs *hubfs) open(path string) (errc int, res *obstack) {
 					obs.ref, err = obs.repository.GetTempRef(c)
 				}
 			}
+			if norm && nil == err {
+				r := obs.ref.Name()
+				n := strings.TrimPrefix(r, "refs/heads/")
+				if r == n {
+					n = strings.TrimPrefix(r, "refs/tags/")
+					if r == n {
+						n = r
+					}
+				}
+				n = strings.ReplaceAll(n, "/", " ")
+				lst[i] = n
+			}
 		default:
 			obs.entry, err = obs.repository.GetTreeEntry(obs.ref, obs.entry, c)
+			if norm && nil == err {
+				lst[i] = obs.entry.Name()
+			}
 		}
 		if nil != err {
 			fs.release(obs)
@@ -93,6 +115,11 @@ func (fs *hubfs) open(path string) (errc int, res *obstack) {
 		}
 	}
 	res = obs
+	return
+}
+
+func (fs *hubfs) open(path string) (errc int, res *obstack) {
+	errc, res, _ = fs.openex(path, false)
 	return
 }
 
@@ -131,6 +158,21 @@ func (fs *hubfs) getattr(obs *obstack, entry providers.TreeEntry, path string, s
 	} else {
 		fuseStat(stat, fuse.S_IFDIR, 0, time.Now())
 	}
+
+	return
+}
+
+func (fs *hubfs) Readpath(path string) (errc int, target string) {
+	defer trace(path)(&errc, &target)
+
+	errc, obs, normpath := fs.openex(path, true)
+	if 0 == errc {
+		fs.release(obs)
+	}
+
+	errc = 0
+	target = "/" + pathutil.Join(normpath...)
+	target = strings.TrimPrefix(target, strings.TrimSuffix(fs.prefix, "/"))
 
 	return
 }

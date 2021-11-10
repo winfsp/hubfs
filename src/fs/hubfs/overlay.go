@@ -15,7 +15,6 @@ package hubfs
 
 import (
 	"os"
-	pathutil "path"
 	"path/filepath"
 	"strings"
 	"time"
@@ -79,14 +78,10 @@ func newOverlay(c Config) fuse.FileSystemInterface {
 			return nil
 		}
 
-		readd := func(path string) (string, string) {
-			return "", pathutil.Join(prefix, path)
-		}
-
 		upfs := ptfs.New(root)
-		lofs := overlayfs.New(overlayfs.Config{
-			Topfs:   topfs,
-			Split:   readd,
+		lofs := new(Config{
+			Client:  topfs.client,
+			Prefix:  prefix,
 			Caseins: caseins,
 		})
 		unfs := unionfs.New(unionfs.Config{

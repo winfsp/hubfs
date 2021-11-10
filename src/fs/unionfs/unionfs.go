@@ -16,6 +16,7 @@ package unionfs
 import (
 	pathutil "path"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -259,6 +260,24 @@ func (fs *filesystem) notempty(path string, isopq bool, v uint8) (res bool) {
 	return
 }
 
+func (fs *filesystem) readpath(path string, v uint8) string {
+	if !fs.filemap.Caseins {
+		return path
+	}
+
+	rp, ok := fs.fslist[v].(FileSystemReadpath)
+	if !ok {
+		return path
+	}
+
+	errc, p := rp.Readpath(path)
+	if 0 != errc || strings.ToUpper(p) != strings.ToUpper(path) {
+		return path
+	}
+
+	return p
+}
+
 func (fs *filesystem) mkpdir(path string) (errc int) {
 	path = pathutil.Dir(path)
 
@@ -306,6 +325,8 @@ func (fs *filesystem) mkpdir(path string) (errc int) {
 }
 
 func (fs *filesystem) _cpdir(path string, v uint8, stat *fuse.Stat_t) (errc int) {
+	path = fs.readpath(path, v)
+
 	dstfs := fs.fslist[0]
 
 	mode := stat.Mode & 0777
@@ -357,6 +378,8 @@ func (fs *filesystem) cpdir(path string, v uint8, stat *fuse.Stat_t) (errc int) 
 }
 
 func (fs *filesystem) cplink(path string, v uint8, stat *fuse.Stat_t) (errc int) {
+	path = fs.readpath(path, v)
+
 	srcfs := fs.fslist[v]
 	dstfs := fs.fslist[0]
 
@@ -404,6 +427,8 @@ func (fs *filesystem) cplink(path string, v uint8, stat *fuse.Stat_t) (errc int)
 }
 
 func (fs *filesystem) cpfile(path string, v uint8, stat *fuse.Stat_t, srcfh uint64) (errc int) {
+	path = fs.readpath(path, v)
+
 	srcfs := fs.fslist[v]
 	dstfs := fs.fslist[0]
 
@@ -545,7 +570,7 @@ func (fs *filesystem) cptree(path string, v uint8, stat *fuse.Stat_t, paths *[]s
 }
 
 func (fs *filesystem) mknode(path string, isdir bool, fn func(v uint8) int) (errc int) {
-	if hasPathPrefix(path, fs.pmpath) {
+	if hasPathPrefix(path, fs.pmpath, fs.filemap.Caseins) {
 		return -fuse.EPERM
 	}
 
@@ -582,7 +607,7 @@ func (fs *filesystem) mknode(path string, isdir bool, fn func(v uint8) int) (err
 }
 
 func (fs *filesystem) rmnode(path string, isdir bool, fn func(v uint8) int) (errc int) {
-	if hasPathPrefix(path, fs.pmpath) {
+	if hasPathPrefix(path, fs.pmpath, fs.filemap.Caseins) {
 		return -fuse.EPERM
 	}
 
@@ -629,7 +654,8 @@ func (fs *filesystem) rmnode(path string, isdir bool, fn func(v uint8) int) (err
 }
 
 func (fs *filesystem) renode(oldpath string, newpath string, link bool, fn func(v uint8) int) (errc int) {
-	if hasPathPrefix(oldpath, fs.pmpath) || hasPathPrefix(newpath, fs.pmpath) {
+	if hasPathPrefix(oldpath, fs.pmpath, fs.filemap.Caseins) ||
+		hasPathPrefix(newpath, fs.pmpath, fs.filemap.Caseins) {
 		return -fuse.EPERM
 	}
 
@@ -705,7 +731,7 @@ func (fs *filesystem) renode(oldpath string, newpath string, link bool, fn func(
 }
 
 func (fs *filesystem) getnode(path string, fn func(isopq bool, v uint8) int) (errc int) {
-	if hasPathPrefix(path, fs.pmpath) {
+	if hasPathPrefix(path, fs.pmpath, fs.filemap.Caseins) {
 		return -fuse.EPERM
 	}
 
@@ -725,7 +751,7 @@ func (fs *filesystem) getnode(path string, fn func(isopq bool, v uint8) int) (er
 }
 
 func (fs *filesystem) setnode(path string, fn func(v uint8) int) (errc int) {
-	if hasPathPrefix(path, fs.pmpath) {
+	if hasPathPrefix(path, fs.pmpath, fs.filemap.Caseins) {
 		return -fuse.EPERM
 	}
 
@@ -999,7 +1025,7 @@ func (fs *filesystem) Open(path string, flags int) (errc int, fh uint64) {
 
 func (fs *filesystem) Getattr(path string, stat *fuse.Stat_t, fh uint64) (errc int) {
 	if ^uint64(0) == fh {
-		if hasPathPrefix(path, fs.pmpath) {
+		if hasPathPrefix(path, fs.pmpath, fs.filemap.Caseins) {
 			return -fuse.EPERM
 		}
 
@@ -1201,7 +1227,11 @@ func (fs *filesystem) Setchgtime(path string, tmsp fuse.Timespec) (errc int) {
 	})
 }
 
-func hasPathPrefix(path, prefix string) bool {
+func hasPathPrefix(path, prefix string, caseins bool) bool {
+	if caseins {
+		path = strings.ToUpper(path)
+		prefix = strings.ToUpper(prefix)
+	}
 	return path == prefix ||
 		(len(path) > len(prefix) && path[:len(prefix)] == prefix && path[len(prefix)] == '/')
 }

@@ -67,6 +67,7 @@ func (fs *filesystem) acquirefs(path string, delta int) (dstfs *shardfs, remain 
 		return
 	}
 
+	csprefix := prefix
 	if fs.caseins {
 		prefix = strings.ToUpper(prefix)
 	}
@@ -74,7 +75,7 @@ func (fs *filesystem) acquirefs(path string, delta int) (dstfs *shardfs, remain 
 	fs.fsmux.Lock()
 	dstfs = fs.fsmap[prefix]
 	if nil == dstfs {
-		if newfs := fs.newfs(prefix); nil != newfs {
+		if newfs := fs.newfs(csprefix); nil != newfs {
 			dstfs = &shardfs{FileSystemInterface: newfs, prefix: prefix}
 			fs.fsmap[prefix] = dstfs
 			dstfs.Init()
