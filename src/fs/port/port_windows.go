@@ -25,19 +25,13 @@ import (
 )
 
 func Chdir(path string) (errc int) {
-	pathu16, e := syscall.UTF16PtrFromString(path)
-	if nil != e {
-		return Errno(e)
-	}
+	winpath := mkwinpath(path)
 
-	return Errno(syscall.SetCurrentDirectory(pathu16))
+	return Errno(syscall.SetCurrentDirectory(winpath))
 }
 
 func Statfs(path string, stat *fuse.Statfs_t) (errc int) {
-	pathu16, e := syscall.UTF16PtrFromString(path)
-	if nil != e {
-		return Errno(e)
-	}
+	winpath := mkwinpath(path)
 
 	var VolumeSerialNumber,
 		MaxComponentLength,
@@ -46,13 +40,13 @@ func Statfs(path string, stat *fuse.Statfs_t) (errc int) {
 		NumberOfFreeClusters,
 		TotalNumberOfClusters uint32
 
-	var rootu16 [260]uint16
+	var winroot [260]uint16
 	r1, _, e := syscall.Syscall(
 		getVolumePathNameW.Addr(),
 		3,
-		uintptr(unsafe.Pointer(pathu16)),
-		uintptr(unsafe.Pointer(&rootu16)),
-		uintptr(len(rootu16)))
+		uintptr(unsafe.Pointer(winpath)),
+		uintptr(unsafe.Pointer(&winroot)),
+		uintptr(len(winroot)))
 	if 0 == r1 {
 		return Errno(e)
 	}
@@ -60,7 +54,7 @@ func Statfs(path string, stat *fuse.Statfs_t) (errc int) {
 	r1, _, e = syscall.Syscall9(
 		getVolumeInformationW.Addr(),
 		8,
-		uintptr(unsafe.Pointer(&rootu16)),
+		uintptr(unsafe.Pointer(&winroot)),
 		0,
 		0,
 		uintptr(unsafe.Pointer(&VolumeSerialNumber)),
@@ -76,7 +70,7 @@ func Statfs(path string, stat *fuse.Statfs_t) (errc int) {
 	r1, _, e = syscall.Syscall6(
 		getDiskFreeSpaceW.Addr(),
 		5,
-		uintptr(unsafe.Pointer(&rootu16)),
+		uintptr(unsafe.Pointer(&winroot)),
 		uintptr(unsafe.Pointer(&SectorsPerCluster)),
 		uintptr(unsafe.Pointer(&BytesPerSector)),
 		uintptr(unsafe.Pointer(&NumberOfFreeClusters)),
@@ -103,12 +97,9 @@ func Mknod(path string, mode uint32, dev int) (errc int) {
 }
 
 func Mkdir(path string, mode uint32) (errc int) {
-	pathu16, e := syscall.UTF16PtrFromString(path)
-	if nil != e {
-		return Errno(e)
-	}
+	winpath := mkwinpath(path)
 
-	return Errno(syscall.CreateDirectory(pathu16, nil))
+	return Errno(syscall.CreateDirectory(winpath, nil))
 }
 
 func Unlink(path string) (errc int) {
@@ -162,19 +153,12 @@ func Link(oldpath string, newpath string) (errc int) {
 
 func Symlink(oldpath string, newpath string) (errc int) {
 	oldpath = strings.ReplaceAll(oldpath, `/`, `\`)
-	oldpathu16, e := syscall.UTF16PtrFromString(oldpath)
-	if nil != e {
-		return Errno(e)
-	}
-
-	newpathu16, e := syscall.UTF16PtrFromString(newpath)
-	if nil != e {
-		return Errno(e)
-	}
+	oldwinpath := mkwinpath(oldpath)
+	newwinpath := mkwinpath(newpath)
 
 	return Errno(syscall.CreateSymbolicLink(
-		newpathu16,
-		oldpathu16,
+		newwinpath,
+		oldwinpath,
 		3 /*DIRECTORY | ALLOW_UNPRIVILEGED_CREATE*/))
 }
 
@@ -239,17 +223,16 @@ func Rename(oldpath string, newpath string) (errc int) {
 			FileName       [1]uint16
 		}
 
-		nu16 := utf16.Encode([]rune(newpath))
-		size := int(unsafe.Offsetof(FILE_RENAME_INFO{}.FileName)) + (len(nu16)+1)*2
-		buf := make([]uint8, size)
+		newwinpath := mkwinpathslice(newpath)
+		size := int(unsafe.Offsetof(FILE_RENAME_INFO{}.FileName)) + (len(newwinpath))*2
+		ibuf := make([]uint8, size)
 
-		info := (*FILE_RENAME_INFO)(unsafe.Pointer(&buf[0]))
+		info := (*FILE_RENAME_INFO)(unsafe.Pointer(&ibuf[0]))
 		info.Flags = 0x43 /*REPLACE_IF_EXISTS | POSIX_SEMANTICS | IGNORE_READONLY_ATTRIBUTE*/
-		info.FileNameLength = uint32(len(nu16) * 2)
+		info.FileNameLength = uint32(len(newwinpath))*2 - 2
 
-		nbuf := (*[1 << 30]uint16)(unsafe.Pointer(&info.FileName))[:len(nu16)+1]
-		copy(nbuf, nu16)
-		nbuf[len(nu16)] = 0
+		nbuf := (*[1 << 30]uint16)(unsafe.Pointer(&info.FileName))[:len(newwinpath)]
+		copy(nbuf, newwinpath)
 
 		r1, _, e := syscall.Syscall6(
 			setFileInformationByHandle.Addr(),
@@ -680,6 +663,23 @@ func Errno(err error) int {
 	return -fuse.EINVAL
 }
 
+func mkwinpathslice(path string) []uint16 {
+	if 2 <= len(path) {
+		if '\\' == path[0] && '\\' == path[1] {
+			if !(4 <= len(path) && '\\' == path[3] && ('?' == path[2] || '.' == path[2])) {
+				path = `\\?\UNC\` + path
+			}
+		} else if ':' == path[1] && 'z'-'a' >= path[0]|0x20-'a' {
+			path = `\\?\` + path
+		}
+	}
+	return utf16.Encode([]rune(path + "\x00"))
+}
+
+func mkwinpath(path string) *uint16 {
+	return &mkwinpathslice(path)[0]
+}
+
 func open(
 	path string, DesiredAccess uint32, CreateDisposition uint32, FlagsAndAttributes uint32) (
 	errc int, fh uint64) {
@@ -688,13 +688,10 @@ func open(
 		openReparsePoint = 0
 	}
 
-	pathu16, e := syscall.UTF16PtrFromString(path)
-	if nil != e {
-		return Errno(e), ^uint64(0)
-	}
+	winpath := mkwinpath(path)
 
 	h, e := syscall.CreateFile(
-		pathu16,
+		winpath,
 		DesiredAccess,
 		syscall.FILE_SHARE_READ|syscall.FILE_SHARE_WRITE|syscall.FILE_SHARE_DELETE,
 		nil,
