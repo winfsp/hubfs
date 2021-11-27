@@ -499,12 +499,12 @@ func Readdir(fh uint64, fill func(name string, stat *fuse.Stat_t, ofst int64) bo
 	}
 	buf := [16 * 1024]uint8{}
 
-	for {
+	for cls := 15; ; /*FileFullDirectoryRestartInfo*/ {
 		r1, _, e := syscall.Syscall6(
 			getFileInformationByHandleEx.Addr(),
 			4,
 			uintptr(fh),                      /* FileHandle */
-			14,                               /* FileInformationClass = FileFullDirectoryInfo */
+			uintptr(cls),                     /* FileInformationClass */
 			uintptr(unsafe.Pointer(&buf[0])), /* FileInformation */
 			uintptr(len(buf)),                /* Length */
 			0,
@@ -515,6 +515,7 @@ func Readdir(fh uint64, fill func(name string, stat *fuse.Stat_t, ofst int64) bo
 			}
 			return Errno(e)
 		}
+		cls = 14 /*FileFullDirectoryInfo*/
 
 		for next := uint32(0); ; {
 			info := (*FILE_FULL_DIR_INFO)(unsafe.Pointer(&buf[next]))
