@@ -66,20 +66,14 @@ func (self *filesystem) Link(oldpath string, newpath string) (errc int) {
 func (self *filesystem) Symlink(target string, newpath string) (errc int) {
 	defer port.Setuidgid()()
 	newpath = filepath.Join(self.root, newpath)
-	target = filepath.Join(self.root, target)
-
 	root := self.root
 	if !strings.HasSuffix(root, string(filepath.Separator)) {
 		root += string(filepath.Separator)
 	}
-	if !strings.HasPrefix(target, root) {
+	dest := filepath.Join(filepath.Dir(newpath), target)
+	if !strings.HasPrefix(dest, root) {
 		return -fuse.EPERM
 	}
-	target, e := filepath.Rel(self.root, target)
-	if nil != e {
-		return -fuse.EPERM
-	}
-
 	return port.Symlink(target, newpath)
 }
 
