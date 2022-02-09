@@ -385,6 +385,7 @@ func Fstat(fh uint64, stat *fuse.Stat_t) (errc int) {
 	}
 
 	*stat = fuse.Stat_t{}
+	stat.Ino = (uint64(info.FileIndexHigh) << 32) | uint64(info.FileIndexLow)
 	stat.Mode = mapFileAttributesToMode(info.FileAttributes)
 	stat.Nlink = 1
 	stat.Size = (int64(info.FileSizeHigh) << 32) | int64(info.FileSizeLow)
@@ -483,7 +484,7 @@ func Opendir(path string) (errc int, fh uint64) {
 }
 
 func Readdir(fh uint64, fill func(name string, stat *fuse.Stat_t, ofst int64) bool) (errc int) {
-	type FILE_FULL_DIR_INFO struct {
+	type FILE_ID_BOTH_DIR_INFO struct {
 		NextEntryOffset uint32
 		FileIndex       uint32
 		CreationTime    uint64
@@ -495,11 +496,14 @@ func Readdir(fh uint64, fill func(name string, stat *fuse.Stat_t, ofst int64) bo
 		FileAttributes  uint32
 		FileNameLength  uint32
 		EaSize          uint32
+		ShortNameLength uint32
+		ShortName       [12]uint16
+		FileId          uint64
 		FileName        [1]uint16
 	}
 	buf := [16 * 1024]uint8{}
 
-	for cls := 15; ; /*FileFullDirectoryRestartInfo*/ {
+	for cls := 11; ; /*FileIdBothDirectoryRestartInfo*/ {
 		r1, _, e := syscall.Syscall6(
 			getFileInformationByHandleEx.Addr(),
 			4,
@@ -515,16 +519,17 @@ func Readdir(fh uint64, fill func(name string, stat *fuse.Stat_t, ofst int64) bo
 			}
 			return Errno(e)
 		}
-		cls = 14 /*FileFullDirectoryInfo*/
+		cls = 10 /*FileIdBothDirectoryInfo*/
 
 		for next := uint32(0); ; {
-			info := (*FILE_FULL_DIR_INFO)(unsafe.Pointer(&buf[next]))
+			info := (*FILE_ID_BOTH_DIR_INFO)(unsafe.Pointer(&buf[next]))
 			next += info.NextEntryOffset
 
 			nbuf := (*[1 << 30]uint16)(unsafe.Pointer(&info.FileName))[:info.FileNameLength/2]
 			name := string(utf16.Decode(nbuf))
 
 			stat := fuse.Stat_t{}
+			stat.Ino = info.FileId
 			stat.Mode = mapFileAttributesToMode(info.FileAttributes)
 			stat.Nlink = 1
 			stat.Size = int64(info.EndOfFile)
