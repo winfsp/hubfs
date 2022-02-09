@@ -142,7 +142,7 @@ func run() int {
 	flag.Parse()
 
 	if printver {
-		fmt.Printf("%s - %s %s (%s)\nCopyright %s\n",
+		fmt.Printf("%s - %s - version %s (%s)\nCopyright %s\n",
 			MyProductName, MyDescription, MyProductVersion, MyVersion,
 			MyCopyright)
 		return 0
