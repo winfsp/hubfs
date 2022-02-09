@@ -1,7 +1,7 @@
 /*
  * git.go
  *
- * Copyright 2021 Bill Zissimopoulos
+ * Copyright 2021-2022 Bill Zissimopoulos
  */
 /*
  * This file is part of Hubfs.

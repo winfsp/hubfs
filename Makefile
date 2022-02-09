@@ -2,12 +2,12 @@
 
 MyBuildNumber = $(shell date +%y%j)
 MyVersion = 0.2.$(MyBuildNumber)
-MyProductVersion = "2021 Beta2"
+MyProductVersion = "2022 Beta2"
 MyProductStage = "Beta"
 
 MyProductName = "HUBFS"
 MyDescription = "File system for GitHub"
-MyCopyright = "2021 Bill Zissimopoulos"
+MyCopyright = "2021-2022 Bill Zissimopoulos"
 MyCompanyName = "Navimatics LLC"
 
 CertIssuer = "DigiCert"
