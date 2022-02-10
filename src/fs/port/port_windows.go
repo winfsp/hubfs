@@ -24,6 +24,54 @@ import (
 	"github.com/billziss-gh/cgofuse/fuse"
 )
 
+func init() {
+	type TOKEN_PRIVILEGES struct {
+		PrivilegeCount uint32
+		LuidLow        uint32
+		LuidHigh       uint32
+		Attributes     uint32
+	}
+
+	currproc, _ := syscall.GetCurrentProcess()
+
+	var token syscall.Token
+	err := syscall.OpenProcessToken(currproc, syscall.TOKEN_ADJUST_PRIVILEGES, &token)
+	if nil == err {
+		for _, name := range []string{
+			"SeSecurityPrivilege",
+			"SeBackupPrivilege",
+			"SeRestorePrivilege",
+			"SeCreateSymbolicLinkPrivilege"} {
+
+			priv := TOKEN_PRIVILEGES{
+				PrivilegeCount: 1,
+				Attributes:     2, /*SE_PRIVILEGE_ENABLED*/
+			}
+
+			privname := utf16.Encode([]rune(name + "\x00"))
+			r1, _, _ := syscall.Syscall(
+				lookupPrivilegeValueW.Addr(),
+				3,
+				0,
+				uintptr(unsafe.Pointer(&privname[0])),
+				uintptr(unsafe.Pointer(&priv.LuidLow)))
+			if 0 != r1 {
+				syscall.Syscall6(
+					adjustTokenPrivileges.Addr(),
+					6,
+					uintptr(token),
+					0,
+					uintptr(unsafe.Pointer(&priv)),
+					0,
+					0,
+					0)
+			}
+		}
+
+		token.Close()
+	}
+}
+
 func Chdir(path string) (errc int) {
 	winpath := mkwinpath(path)
 
@@ -850,9 +898,12 @@ type _FILE_BASIC_INFO struct {
 
 var (
 	kernel32                     = syscall.MustLoadDLL("kernel32.dll")
+	advapi32                     = syscall.MustLoadDLL("advapi32.dll")
 	getDiskFreeSpaceW            = kernel32.MustFindProc("GetDiskFreeSpaceW")
 	getFileInformationByHandleEx = kernel32.MustFindProc("GetFileInformationByHandleEx")
 	getVolumeInformationW        = kernel32.MustFindProc("GetVolumeInformationW")
 	getVolumePathNameW           = kernel32.MustFindProc("GetVolumePathNameW")
 	setFileInformationByHandle   = kernel32.MustFindProc("SetFileInformationByHandle")
+	lookupPrivilegeValueW        = advapi32.MustFindProc("LookupPrivilegeValueW")
+	adjustTokenPrivileges        = advapi32.MustFindProc("AdjustTokenPrivileges")
 )
