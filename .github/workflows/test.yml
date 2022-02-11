@@ -1,0 +1,89 @@
+name: test
+
+on:
+  push:
+    branches:
+      - "*"
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+
+  test:
+    runs-on: windows-latest
+
+    steps:
+
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Install go
+        uses: actions/setup-go@v2
+        with:
+          stable: true
+
+      - name: Install winfsp and winfsp-tests
+        shell: powershell
+        run: |
+          $releases = Invoke-WebRequest https://api.github.com/repos/billziss-gh/winfsp/releases | `
+              ConvertFrom-Json
+
+          $asseturi = $releases[0].assets.browser_download_url | `
+              Where-Object { $_ -match "winfsp-.*\.msi" }
+          Invoke-WebRequest -Uri $asseturi -Out winfsp.msi
+          Start-Process -NoNewWindow -Wait msiexec "/i winfsp.msi /qn"
+
+          $asseturi = $releases[0].assets.browser_download_url | `
+              Where-Object { $_ -match "winfsp-tests-.*\.zip" }
+          Invoke-WebRequest -Uri $asseturi -Out winfsp-tests.zip
+          Expand-Archive -Path winfsp-tests.zip
+          Copy-Item "C:\Program Files (x86)\WinFsp\bin\winfsp-x64.dll" winfsp-tests
+
+      - name: Build HUBFS
+        shell: powershell
+        run: |
+          .\make.cmd win
+
+      - name: Test component file systems
+        shell: powershell
+        run: |
+          $testexe = (Get-Item winfsp-tests\winfsp-tests-x64.exe)
+          Set-Location src
+          New-Item -Type Directory -Path hi,lo >$null
+          $env:CGO_ENABLED=0
+
+          Start-Process -NoNewWindow go "run _tools/ptfs.go -o uid=-1,rellinks,FileInfoTimeout=-1 lo X:"
+          Start-Sleep 3
+          Push-Location X:\
+          . $testexe --fuse-external --resilient --case-insensitive-cmp `
+              +* `
+              -create_fileattr_test `
+              -delete_access_test `
+              -delete_ex_test `
+              -create_backup_test `
+              -create_restore_test `
+              -rename_flipflop_test `
+              -exec_rename_dir_test `
+              -reparse_nfs_test `
+              -ea*
+          Stop-Process -Name ptfs
+          Start-Sleep 3
+          Pop-Location
+
+          Start-Process -NoNewWindow go "run _tools/unionfs.go -o uid=-1,rellinks,FileInfoTimeout=-1 hi lo X:"
+          Start-Sleep 3
+          Push-Location X:\
+          . $testexe --fuse-external --resilient --case-insensitive-cmp `
+              +* `
+              -create_fileattr_test `
+              -delete_access_test `
+              -delete_ex_test `
+              -create_backup_test `
+              -create_restore_test `
+              -rename_flipflop_test `
+              -exec_rename_dir_test `
+              -reparse_nfs_test `
+              -ea*
+          Stop-Process -Name unionfs
+          Start-Sleep 3
+          Pop-Location

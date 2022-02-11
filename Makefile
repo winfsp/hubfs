@@ -49,7 +49,7 @@ racy:
 .PHONY: win
 win: build
 	powershell -NoProfile -NonInteractive -ExecutionPolicy Unrestricted \
-		"Compress-Archive -Path hubfs.exe -DestinationPath .\hubfs-win-$(MyVersion).zip"
+		"Compress-Archive -Force -Path hubfs.exe -DestinationPath .\hubfs-win-$(MyVersion).zip"
 	candle -nologo -arch x64 -pedantic \
 		-dMyVersion=$(MyVersion) \
 		-dMyProductVersion=$(MyProductVersion) \
@@ -65,7 +65,8 @@ win: build
 		-spdb \
 		-o hubfs-win-$(MyVersion).msi \
 		hubfs.wixobj
-	del hubfs.wixobj
+	powershell -NoProfile -NonInteractive -ExecutionPolicy Unrestricted \
+		"Remove-Item -Force hubfs.wixobj"
 	signtool sign \
 		/ac $(CrossCert) \
 		/i $(CertIssuer) \
