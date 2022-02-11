@@ -38,7 +38,7 @@ func init() {
 	err := syscall.OpenProcessToken(currproc, syscall.TOKEN_ADJUST_PRIVILEGES, &token)
 	if nil == err {
 		for _, name := range []string{
-			"SeSecurityPrivilege",
+			//"SeSecurityPrivilege",
 			"SeBackupPrivilege",
 			"SeRestorePrivilege",
 			"SeCreateSymbolicLinkPrivilege"} {
