@@ -459,10 +459,7 @@ func fuseStat(stat *fuse.Stat_t, mode uint32, size int64, time time.Time) {
 	case fuse.S_IFLNK, 0160000 /* submodule */ :
 		mode = fuse.S_IFLNK | 0777
 	default:
-		mode = fuse.S_IFREG | 0644
-		if 0 != mode&0400 {
-			mode = fuse.S_IFREG | 0755
-		}
+		mode = fuse.S_IFREG | 0644 | (mode & 0111)
 	}
 	ts := fuse.NewTimespec(time)
 	*stat = fuse.Stat_t{
