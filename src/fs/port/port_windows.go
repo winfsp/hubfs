@@ -169,17 +169,31 @@ func Unlink(path string) (errc int) {
 			uintptr(unsafe.Sizeof(info)),
 			0,
 			0)
-		if 0 == r1 && 87 /*ERROR_INVALID_PARAMETER*/ == e {
-			info.Flags = 1 /*DeleteFile*/
-			r1, _, e = syscall.Syscall6(
-				setFileInformationByHandle.Addr(),
-				4,
-				uintptr(fh),
-				4, /*FileDispositionInfo*/
-				uintptr(unsafe.Pointer(&info)),
-				uintptr(unsafe.Sizeof(info)),
-				0,
-				0)
+		if 0 == r1 {
+			/*
+			 * From ntptfs:
+			 *
+			 * Error codes that we return immediately when POSIX unlink fails:
+			 *
+			 * - STATUS_ACCESS_DENIED -> ERROR_ACCESS_DENIED
+			 * - STATUS_CANNOT_DELETE -> ERROR_ACCESS_DENIED
+			 * - STATUS_FILE_DELETED -> ERROR_ACCESS_DENIED
+			 * - STATUS_DIRECTORY_NOT_EMPTY -> ERROR_DIR_NOT_EMPTY
+			 */
+			switch e {
+			case syscall.ERROR_ACCESS_DENIED, syscall.ERROR_DIR_NOT_EMPTY:
+			default:
+				info.Flags = 1 /*DeleteFile*/
+				r1, _, e = syscall.Syscall6(
+					setFileInformationByHandle.Addr(),
+					4,
+					uintptr(fh),
+					4, /*FileDispositionInfo*/
+					uintptr(unsafe.Pointer(&info)),
+					uintptr(unsafe.Sizeof(info)),
+					0,
+					0)
+			}
 		}
 		if 0 == r1 {
 			errc = Errno(e)
@@ -291,17 +305,29 @@ func Rename(oldpath string, newpath string) (errc int) {
 			uintptr(size),
 			0,
 			0)
-		if 0 == r1 && 87 /*ERROR_INVALID_PARAMETER*/ == e {
-			info.Flags = 1 /*ReplaceIfExists*/
-			r1, _, e = syscall.Syscall6(
-				setFileInformationByHandle.Addr(),
-				4,
-				uintptr(fh),
-				3, /*FileRenameInfo*/
-				uintptr(unsafe.Pointer(info)),
-				uintptr(size),
-				0,
-				0)
+		if 0 == r1 {
+			/*
+			 * From ntptfs:
+			 *
+			 * Error codes that we return immediately when POSIX rename fails:
+			 *
+			 * - STATUS_OBJECT_NAME_COLLISION -> ERROR_FILE_EXISTS, ERROR_ALREADY_EXISTS
+			 * - STATUS_ACCESS_DENIED -> ERROR_ACCESS_DENIED
+			 */
+			switch e {
+			case syscall.ERROR_FILE_EXISTS, syscall.ERROR_ALREADY_EXISTS, syscall.ERROR_ACCESS_DENIED:
+			default:
+				info.Flags = 1 /*ReplaceIfExists*/
+				r1, _, e = syscall.Syscall6(
+					setFileInformationByHandle.Addr(),
+					4,
+					uintptr(fh),
+					3, /*FileRenameInfo*/
+					uintptr(unsafe.Pointer(info)),
+					uintptr(size),
+					0,
+					0)
+			}
 		}
 		if 0 == r1 {
 			errc = Errno(e)
