@@ -32,9 +32,14 @@ func main() {
 	bpos := 1
 	epos := len(args)
 	for i := 1; epos > i; i++ {
-		if strings.HasPrefix(args[i], "-") {
+		if "-o" == args[i] {
+			bpos = i + 2
+		} else if strings.HasPrefix(args[i], "-") {
 			bpos = i + 1
 		}
+	}
+	if epos <= bpos {
+		bpos = epos
 	}
 	if epos > bpos {
 		epos--
