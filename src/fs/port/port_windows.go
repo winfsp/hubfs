@@ -387,26 +387,51 @@ func UtimesNano(path string, tmsp []fuse.Timespec) (errc int) {
 }
 
 func Open(path string, flags int, mode uint32) (errc int, fh uint64) {
-	DesiredAccess := uint32(0)
-	switch flags & (fuse.O_RDONLY | fuse.O_WRONLY | fuse.O_RDWR) {
-	case fuse.O_RDONLY:
-		DesiredAccess = syscall.GENERIC_READ
-	case fuse.O_WRONLY:
-		DesiredAccess = syscall.GENERIC_WRITE
-	case fuse.O_RDWR:
-		DesiredAccess = syscall.GENERIC_READ | syscall.GENERIC_WRITE
-	}
-
 	/* we recognize only the O_CREAT flag */
 	CreateDisposition := uint32(syscall.OPEN_EXISTING)
 	FileAttributes := uint32(0)
-	switch flags & (fuse.O_CREAT) {
-	case fuse.O_CREAT:
+	if 0 != flags&(fuse.O_CREAT) {
 		CreateDisposition = syscall.CREATE_NEW
 		FileAttributes = mapModeToFileAttributes(mode, 0)
 	}
 
-	errc, fh = open(path, DesiredAccess, CreateDisposition, FileAttributes)
+	errc, fh = open(path, 0x02000000 /*MAXIMUM_ALLOWED*/, CreateDisposition, FileAttributes)
+	/*
+	 * From ntptfs:
+	 *
+	 * Error codes that we care about when MAXIMUM_ALLOWED fails:
+	 *
+	 * - CREATE_NEW:
+	 *     - STATUS_INVALID_PARAMETER -> ERROR_INVALID_PARAMETER -> -EINVAL
+	 *
+	 * - OPEN_EXISTING:
+	 *     - STATUS_ACCESS_DENIED -> ERROR_ACCESS_DENIED -> -EACCES
+	 *     - STATUS_MEDIA_WRITE_PROTECTED -> ERROR_WRITE_PROTECT -> -EACCES
+	 *     - STATUS_SHARING_VIOLATION -> ERROR_SHARING_VIOLATION -> -EACCES
+	 *     - STATUS_INVALID_PARAMETER -> ERROR_INVALID_PARAMETER -> -EINVAL
+	 *
+	 * The STATUS_INVALID_PARAMETER happens when requesting MAXIMUM_ALLOWED
+	 * together with FILE_DELETE_ON_CLOSE. While we do not use FILE_DELETE_ON_CLOSE
+	 * keep checking for STATUS_INVALID_PARAMETER for future compatibility.
+	 */
+	switch errc {
+	case -fuse.EACCES:
+		if syscall.CREATE_NEW != CreateDisposition {
+			break
+		}
+		fallthrough
+	case -fuse.EINVAL:
+		DesiredAccess := uint32(0)
+		switch flags & (fuse.O_RDONLY | fuse.O_WRONLY | fuse.O_RDWR) {
+		case fuse.O_RDONLY:
+			DesiredAccess = syscall.GENERIC_READ
+		case fuse.O_WRONLY:
+			DesiredAccess = syscall.GENERIC_WRITE
+		case fuse.O_RDWR:
+			DesiredAccess = syscall.GENERIC_READ | syscall.GENERIC_WRITE
+		}
+		errc, fh = open(path, DesiredAccess, CreateDisposition, FileAttributes)
+	}
 	if 0 == errc && 0 != 0x2000&FileAttributes /*FILE_ATTRIBUTE_NOT_CONTENT_INDEXED*/ {
 		/* FILE_ATTRIBUTE_NOT_CONTENT_INDEXED cannot be set by CreateFile; hence this malarkey */
 		Fchmod(fh, mode)
