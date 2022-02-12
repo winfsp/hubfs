@@ -44,6 +44,16 @@ jobs:
         run: |
           .\make.cmd win
 
+      - name: Test go packages
+        shell: powershell
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          Set-Location src
+          $env:CGO_ENABLED=0
+
+          go test -v -count=1 ./...
+
       - name: Test component file systems
         shell: powershell
         run: |

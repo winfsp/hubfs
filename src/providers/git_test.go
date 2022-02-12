@@ -17,6 +17,7 @@ import (
 	"bytes"
 	"io"
 	"io/ioutil"
+	"os"
 	"runtime"
 	"testing"
 
@@ -341,7 +342,10 @@ func init() {
 
 		token, err := keyring.Get("hubfs", "https://github.com")
 		if nil != err {
-			return err
+			token = ""
+		}
+		if "" == token {
+			token = os.Getenv("GITHUB_TOKEN")
 		}
 
 		repository, err = NewGitRepository(remote, token, caseins)

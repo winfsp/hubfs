@@ -14,6 +14,7 @@
 package providers
 
 import (
+	"os"
 	"testing"
 	"time"
 
@@ -169,7 +170,10 @@ func init() {
 	atinit(func() error {
 		token, err := keyring.Get("hubfs", "https://github.com")
 		if nil != err {
-			return err
+			token = ""
+		}
+		if "" == token {
+			token = os.Getenv("GITHUB_TOKEN")
 		}
 
 		client, err = GetProvider("https://github.com").NewClient(token)

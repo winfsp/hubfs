@@ -14,7 +14,6 @@
 package git
 
 import (
-	"fmt"
 	"os"
 	"testing"
 
@@ -158,8 +157,10 @@ func TestMain(m *testing.M) {
 	var err error
 	token, err = keyring.Get("hubfs", "https://github.com")
 	if nil != err {
-		fmt.Fprintf(os.Stderr, "unable to get auth token: %v\n", err)
-		os.Exit(1)
+		token = ""
+	}
+	if "" == token {
+		token = os.Getenv("GITHUB_TOKEN")
 	}
 
 	os.Exit(m.Run())
