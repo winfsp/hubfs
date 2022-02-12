@@ -104,7 +104,7 @@
                         <RegistryValue
                             Type="string"
                             Name="CommandLine"
-                            Value="-auth optional -o VolumePrefix=%\/_1 -o uid=-1 -o FileTimeout=-1,rellinks %\/b/_1 %2" />
+                            Value="-auth optional -o VolumePrefix=%\/_1 -o uid=-1,rellinks,FileInfoTimeout=-1 %\/b/_1 %2" />
                         <RegistryValue
                             Type="string"
                             Name="Security"
