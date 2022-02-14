@@ -10,20 +10,25 @@ on:
 jobs:
 
   test:
-    runs-on: windows-latest
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+      fail-fast: false
 
     steps:
-
       - name: Checkout
         uses: actions/checkout@v2
+        with:
+          submodules: recursive
 
       - name: Install go
         uses: actions/setup-go@v2
         with:
           stable: true
 
-      - name: Install winfsp and winfsp-tests
-        shell: powershell
+      - name: Install winfsp and winfsp-tests (Windows)
+        if: runner.os == 'Windows'
         run: |
           $releases = Invoke-WebRequest https://api.github.com/repos/billziss-gh/winfsp/releases | `
               ConvertFrom-Json
@@ -39,23 +44,45 @@ jobs:
           Expand-Archive -Path winfsp-tests.zip
           Copy-Item "C:\Program Files (x86)\WinFsp\bin\winfsp-x64.dll" winfsp-tests
 
-      - name: Build HUBFS
-        shell: powershell
+      - name: Install FUSE and secfs.test (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get -qq install libfuse-dev
+          sudo apt-get -qq install libacl1-dev
+          git clone -q https://github.com/billziss-gh/secfs.test.git secfs.test
+          git -C secfs.test checkout -q edf5eb4a108bfb41073f765aef0cdd32bb3ee1ed
+          sed -e 's/^fs=.*$/fs="cgofuse"/' -i""  secfs.test/fstest/fstest/tests/conf
+          make -C secfs.test
+
+      - name: Build HUBFS (Windows)
+        if: runner.os == 'Windows'
         run: |
           .\make.cmd win
 
-      - name: Test go packages
-        shell: powershell
+      - name: Build HUBFS (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          make lnx
+
+      - name: Test go packages (Windows)
+        if: runner.os == 'Windows'
         #env:
         #  GITHUB_TOKEN: ${{ github.token }}
         run: |
           Set-Location src
           $env:CGO_ENABLED=0
-
           go test -v -count=1 ./...
 
-      - name: Test component file systems
-        shell: powershell
+      - name: Test go packages (Linux)
+        if: runner.os == 'Linux'
+        #env:
+        #  GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          cd src
+          go test -v -count=1 ./...
+
+      - name: Test component file systems (Windows)
+        if: runner.os == 'Windows'
         run: |
           $testexe = (Get-Item winfsp-tests\winfsp-tests-x64.exe)
           Set-Location src
@@ -97,3 +124,20 @@ jobs:
           Stop-Process -Name unionfs
           Start-Sleep 3
           Pop-Location
+
+      - name: Test component file systems (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          cd src
+          mkdir lo hi mnt
+
+          go build _tools/ptfs.go
+          go build _tools/unionfs.go
+
+          sudo ./ptfs -o allow_other,default_permissions,use_ino,attr_timeout=0 lo mnt &
+          (cd mnt && sudo prove -fr ../../secfs.test/fstest/fstest/tests)
+          sudo umount mnt
+
+          sudo ./unionfs -o allow_other,default_permissions,use_ino,attr_timeout=0 hi lo mnt &
+          (cd mnt && sudo prove -fr ../../secfs.test/fstest/fstest/tests)
+          sudo umount mnt
