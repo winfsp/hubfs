@@ -146,7 +146,8 @@ jobs:
           sudo ./unionfs -o allow_other,default_permissions,use_ino,attr_timeout=0 hi lo mnt &
           sleep 3
           (cd mnt && sudo prove -fr ../../secfs.test/fstest/fstest/tests)
+          (cd mnt && ../../secfs.test/tools/bin/fsx -N 50000 test xxxxxx)
           seed=$(date +%s)
-          ../secfs.test/tools/bin/fsstress -d mnt -s $seed -n 10000 -p 10 -S
-          ../secfs.test/tools/bin/fsstress -d mnt -s $seed -n 10000 -p 10 -S
+          ../secfs.test/tools/bin/fsstress -d mnt -s $seed -n 5000 -p 10 -S
+          ../secfs.test/tools/bin/fsstress -d mnt -s $seed -n 5000 -p 10 -S
           sudo umount mnt
