@@ -15,6 +15,7 @@ package unionfs
 
 import (
 	pathutil "path"
+	"runtime"
 	"sort"
 	"strings"
 	"sync"
@@ -78,6 +79,20 @@ func (fs *filesystem) getvis(path string, stat *fuse.Stat_t) (errc int, isopq bo
 	fs.pathmap.Lock()
 	isopq, v = fs.pathmap.Get(path)
 	fs.pathmap.Unlock()
+
+	if "linux" == runtime.GOOS {
+		/* Linux can send us invalid/long paths. Perform check here. */
+		for i, c := 0, 0; len(path) > i; i++ {
+			if '/' == path[i] {
+				c = 0
+			} else {
+				c++
+				if 255 < c {
+					return -fuse.ENAMETOOLONG, isopq, NOTEXIST
+				}
+			}
+		}
+	}
 
 	if UNKNOWN == v {
 		u := NOTEXIST
