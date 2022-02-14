@@ -13,7 +13,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [windows-latest, ubuntu-latest]
+        os: [windows-latest, ubuntu-latest, macos-10.15]
       fail-fast: false
 
     steps:
@@ -49,37 +49,92 @@ jobs:
         run: |
           sudo apt-get -qq install libfuse-dev
           sudo apt-get -qq install libacl1-dev
+
           git clone -q https://github.com/billziss-gh/secfs.test.git secfs.test
           git -C secfs.test checkout -q edf5eb4a108bfb41073f765aef0cdd32bb3ee1ed
-          sed -e 's/^fs=.*$/fs="cgofuse"/' -i""  secfs.test/fstest/fstest/tests/conf
+          mkdir -p secfs.test/tools/bin
+          touch secfs.test/tools/bin/bonnie++
+          touch secfs.test/tools/bin/iozone
           make -C secfs.test
+
+          # configure fstest for cgofuse
+          sed -e 's/^fs=.*$/fs="cgofuse"/' -i""  secfs.test/fstest/fstest/tests/conf
+
+          # remove irrelevant tests
+          rm -rf secfs.test/fstest/fstest/tests/xacl
+          rm -rf secfs.test/fstest/fstest/tests/zzz_ResourceFork
+
+      - name: Install FUSE and secfs.test (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          # requires macos-10.15; does not work on macos-latest
+          # see https://github.com/actions/virtual-environments/issues/4731
+          brew install macfuse
+
+          git clone -q https://github.com/billziss-gh/secfs.test.git secfs.test
+          git -C secfs.test checkout -q edf5eb4a108bfb41073f765aef0cdd32bb3ee1ed
+          mkdir -p secfs.test/tools/bin
+          touch secfs.test/tools/bin/bonnie++
+          touch secfs.test/tools/bin/iozone
+          make -C secfs.test
+
+          # configure fstest for cgofuse
+          sed -e 's/^fs=.*$/fs="cgofuse"/' -i ""  secfs.test/fstest/fstest/tests/conf
+
+          # monkey patch some tests for macOS
+          sed -e 's/expect EINVAL \(.*\.\.\)$/expect ENOTEMPTY \1/' -i ""  secfs.test/fstest/fstest/tests/rmdir/12.t
+          sed -e 's/lchmod)/lchmod) return 1/' -i "" secfs.test/fstest/fstest/tests/misc.sh
+
+          # remove irrelevant tests
+          rm -rf secfs.test/fstest/fstest/tests/xacl
+          rm -rf secfs.test/fstest/fstest/tests/zzz_ResourceFork
+
+          # remove tests that fail on macOS with ENAMETOOLONG: these tests send a path
+          # with a length close to 1024; when ptfs/unionfs prefixes them with the backing
+          # directory the total path is over 1024 and macOS errors with ENAMETOOLONG
+          rm secfs.test/fstest/fstest/tests/chflags/03.t
+          rm secfs.test/fstest/fstest/tests/chmod/03.t
+          rm secfs.test/fstest/fstest/tests/chown/03.t
+          rm secfs.test/fstest/fstest/tests/link/03.t
+          rm secfs.test/fstest/fstest/tests/mkdir/03.t
+          rm secfs.test/fstest/fstest/tests/mkfifo/03.t
+          rm secfs.test/fstest/fstest/tests/open/03.t
+          rm secfs.test/fstest/fstest/tests/rename/02.t
+          rm secfs.test/fstest/fstest/tests/rmdir/03.t
+          rm secfs.test/fstest/fstest/tests/symlink/03.t
+          rm secfs.test/fstest/fstest/tests/truncate/03.t
+          rm secfs.test/fstest/fstest/tests/unlink/03.t
 
       - name: Build HUBFS (Windows)
         if: runner.os == 'Windows'
         run: |
           .\make.cmd win
 
-      - name: Build HUBFS (Linux)
-        if: runner.os == 'Linux'
+      - name: Build HUBFS (Linux / macOS)
+        if: runner.os == 'Linux' || runner.os == 'macOS'
         run: |
-          make lnx
+          make
 
-      - name: Test go packages (Windows)
+      - name: Test HUBFS packages (Windows)
         if: runner.os == 'Windows'
-        #env:
-        #  GITHUB_TOKEN: ${{ github.token }}
+        # It is not possible to run the git and providers tests, because of GitHub rate limiting.
+        # If we try to use GITHUB_TOKEN the tests fail because GitHub responds with an HTTP 403
+        # error and message "Resource not accessible by integration" (e.g. when trying to access
+        # /user).
         run: |
           Set-Location src
           $env:CGO_ENABLED=0
-          go test -v -count=1 ./...
+          go test -count=1 ./fs/...
 
-      - name: Test go packages (Linux)
-        if: runner.os == 'Linux'
-        #env:
-        #  GITHUB_TOKEN: ${{ github.token }}
+      - name: Test HUBFS packages (Linux / macOS)
+        if: runner.os == 'Linux' || runner.os == 'macOS'
+        # It is not possible to run the git and providers tests, because of GitHub rate limiting.
+        # If we try to use GITHUB_TOKEN the tests fail because GitHub responds with an HTTP 403
+        # error and message "Resource not accessible by integration" (e.g. when trying to access
+        # /user).
         run: |
           cd src
-          go test -v -count=1 ./...
+          go test -count=1 ./fs/...
 
       - name: Test component file systems (Windows)
         if: runner.os == 'Windows'
@@ -130,8 +185,8 @@ jobs:
           Start-Sleep 3
           Pop-Location
 
-      - name: Test component file systems (Linux)
-        if: runner.os == 'Linux'
+      - name: Test component file systems (Linux / macOS)
+        if: runner.os == 'Linux' || runner.os == 'macOS'
         run: |
           set -x
 
