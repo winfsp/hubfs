@@ -91,7 +91,10 @@ jobs:
           New-Item -Type Directory -Path hi,lo >$null
           $env:CGO_ENABLED=0
 
-          Start-Process -NoNewWindow go "run _tools/ptfs.go -o uid=-1,rellinks,FileInfoTimeout=-1 lo X:"
+          go build _tools/ptfs.go
+          go build _tools/unionfs.go
+
+          Start-Process -NoNewWindow .\ptfs.exe "-o uid=-1,rellinks,FileInfoTimeout=-1 lo X:"
           Start-Sleep 3
           Push-Location X:\
           . $testexe --fuse-external --resilient --case-insensitive-cmp `
@@ -109,7 +112,7 @@ jobs:
           Start-Sleep 3
           Pop-Location
 
-          Start-Process -NoNewWindow go "run _tools/unionfs.go -o uid=-1,rellinks,FileInfoTimeout=-1 hi lo X:"
+          Start-Process -NoNewWindow .\unionfs.exe "-o uid=-1,rellinks,FileInfoTimeout=-1 hi lo X:"
           Start-Sleep 3
           Push-Location X:\
           . $testexe --fuse-external --resilient --case-insensitive-cmp `
