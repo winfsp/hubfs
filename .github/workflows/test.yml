@@ -84,6 +84,8 @@ jobs:
       - name: Test component file systems (Windows)
         if: runner.os == 'Windows'
         run: |
+          Set-PSDebug -Trace 1
+
           $testexe = (Get-Item winfsp-tests\winfsp-tests-x64.exe)
           Set-Location src
           New-Item -Type Directory -Path hi,lo >$null
@@ -128,6 +130,8 @@ jobs:
       - name: Test component file systems (Linux)
         if: runner.os == 'Linux'
         run: |
+          set -x
+
           cd src
           mkdir lo hi mnt
 
@@ -135,9 +139,14 @@ jobs:
           go build _tools/unionfs.go
 
           sudo ./ptfs -o allow_other,default_permissions,use_ino,attr_timeout=0 lo mnt &
+          sleep 3
           (cd mnt && sudo prove -fr ../../secfs.test/fstest/fstest/tests)
           sudo umount mnt
 
           sudo ./unionfs -o allow_other,default_permissions,use_ino,attr_timeout=0 hi lo mnt &
+          sleep 3
           (cd mnt && sudo prove -fr ../../secfs.test/fstest/fstest/tests)
+          seed=$(date +%s)
+          ../secfs.test/tools/bin/fsstress -d mnt -s $seed -n 10000 -p 10 -S
+          ../secfs.test/tools/bin/fsstress -d mnt -s $seed -n 10000 -p 10 -S
           sudo umount mnt
