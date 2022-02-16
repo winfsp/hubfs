@@ -164,6 +164,12 @@ func Readdir(fh uint64, fill func(name string, stat *fuse.Stat_t, ofst int64) bo
 	ptr := 0
 	end := 0
 
+	/* seek to beginning of directory in case file handle is being reused */
+	_, e := syscall.Seek(int(fh), 0, 0 /*SEEK_SET*/)
+	if nil != e {
+		return Errno(e)
+	}
+
 	for {
 		if end <= ptr {
 			ptr = 0
