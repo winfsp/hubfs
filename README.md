@@ -10,7 +10,7 @@ HUBFS &middot; File System for GitHub
 <img src="https://img.shields.io/github/release/billziss-gh/hubfs/all.svg?label=Download&colorB=e52e4b&style=for-the-badge"/>
 </a>
 
-HUBFS is a read-only file system for GitHub and Git. Git repositories and their contents are represented as regular directories and files and are accessible by any application, without the application having any knowledge that it is really accessing a remote Git repository.
+HUBFS is a file system for GitHub and Git. Git repositories and their contents are represented as regular directories and files and are accessible by any application, without the application having any knowledge that it is really accessing a remote Git repository. The repositories are writable and allow editing files and running build operations.
 <br/>
 <br/>
 <img src="doc/cap1.gif" width="75%"/>
@@ -36,6 +36,32 @@ HUBFS will then open your system browser where you will be able to authorize it 
 
 To unmount the file system simply use <kbd>Ctrl-C</kbd>. On macOS and Linux you may also be able to unmount using `umount` or `fusermount -u`.
 
+### Full command-line usage
+
+The full HUBFS command line usage is as follows:
+
+```
+usage: hubfs [options] [remote] mountpoint
+
+  -auth method
+        method is from list below; auth tokens are stored in system keyring
+        - force     perform interactive auth even if token present
+        - full      perform interactive auth if token not present (default)
+        - required  auth token required to be present
+        - optional  auth token will be used if present
+        - none      do not use auth token even if present
+  -authkey name
+        name of key that stores auth token in system keyring
+  -authonly
+        perform auth only; do not mount
+  -o options
+        FUSE mount options
+  -version
+        print version information
+```
+
+When running from the command line, the recommended FUSE options for Windows are `uid=-1,rellinks,FileInfoTimeout=-1`.
+
 ### File system representation
 
 By default HUBFS presents the following file system hierarchy: / *owner* / *repository* / *ref* / *path*
@@ -48,7 +74,9 @@ By default HUBFS presents the following file system hierarchy: / *owner* / *repo
 
 - *Path* is a path to actual file content within the repository.
 
-HUBFS interprets submodules as symlinks. These submodules can be followed if they point to other GitHub repositories (this currently works well only on Windows when using the `-o rellinks` option). General repository symlinks should work as well.
+HUBFS interprets submodules as symlinks. These submodules can be followed if they point to other GitHub repositories. General repository symlinks should work as well. (On Windows you must use the FUSE option `rellinks` for this to work correctly.)
+
+With release 2022 Beta2 HUBFS repository directories are now writable. This is implemented as a union file system that overlays a read-write local file system over the read-only Git content. This scheme allows files to be edited and builds to be performed. A special file named `.keep` is created at the *ref* root (full path: / *owner* / *repository* / *ref* / `.keep`). When the edit/build modifications are no longer required the `.keep` file may be deleted and the *ref* root will be garbage collected when not in use (i.e. when no files are open in it -- having a terminal window open with a current directory inside a *ref* root counts as an open file and the *ref* will not be garbage collected).
 
 ### Windows integration
 
@@ -102,11 +130,9 @@ HUBFS fetches objects with a depth of 1 and a filter of `tree:0`. This ensures t
 
 ## Potential future improvements
 
-- The file system is currently read-only. This means that the common scenario of building inside the repository is not supported. In the future this problem may be alleviated either in this or another project.
-
 - The file system does not present a `.git` subdirectory. It may be worthwhile to present a virtual `.git` directory so that simple Git commands (like `git status`) would work.
 
-- Additional providers such as BitBucket, GitLab, etc.
+- Additional providers such as GitHub Enterprise, BitBucket, GitLab, etc.
 
 ## License
 
