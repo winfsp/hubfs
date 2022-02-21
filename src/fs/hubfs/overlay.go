@@ -15,6 +15,7 @@ package hubfs
 
 import (
 	"os"
+	pathutil "path"
 	"path/filepath"
 	"strings"
 	"time"
@@ -34,11 +35,17 @@ func New(c Config) fuse.FileSystemInterface {
 }
 
 func newOverlay(c Config) fuse.FileSystemInterface {
+	scope := c.Prefix
 	caseins := c.Caseins
 
-	topfs := new(c).(*hubfs)
+	topfs := new(Config{
+		Client:  c.Client,
+		Prefix:  "",
+		Caseins: c.Caseins,
+	}).(*hubfs)
 
 	split := func(path string) (string, string) {
+		path = pathutil.Join(scope, path)
 		slashes := 0
 		for i := 0; len(path) > i; i++ {
 			if '/' == path[i] {
