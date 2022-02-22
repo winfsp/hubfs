@@ -77,9 +77,15 @@ func newOverlay(c Config) fuse.FileSystemInterface {
 		}
 		n = strings.ReplaceAll(n, "/", " ")
 
-		root := filepath.Join(obs.repository.GetDirectory(), "files", n)
-
+		root := filepath.Join(obs.repository.GetDirectory(), "files")
 		err := os.MkdirAll(root, 0700)
+		if nil != err {
+			topfs.release(obs)
+			return nil
+		}
+
+		root = filepath.Join(root, n)
+		err = os.MkdirAll(root, 0755)
 		if nil != err {
 			topfs.release(obs)
 			return nil
