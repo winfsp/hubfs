@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"os/user"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -221,6 +222,16 @@ func run() int {
 	if !authonly {
 		for _, m := range mntopt {
 			for _, s := range strings.Split(m, ",") {
+				if "windows" != runtime.GOOS {
+					/* on Windows, WinFsp handles uid=-1,gid=-1 for us */
+					if "uid=-1" == s {
+						u, _ := user.Current()
+						s = "uid=" + u.Uid
+					} else if "gid=-1" == s {
+						u, _ := user.Current()
+						s = "gid=" + u.Gid
+					}
+				}
 				config = append(config, s)
 			}
 		}
