@@ -196,7 +196,9 @@ func (client *githubClient) sendrecv(path string) (*http.Response, error) {
 		return nil, err
 	}
 
-	if 400 <= rsp.StatusCode {
+	if 404 == rsp.StatusCode {
+		return nil, ErrNotFound
+	} else if 400 <= rsp.StatusCode {
 		return nil, errors.New(fmt.Sprintf("HTTP %d", rsp.StatusCode))
 	}
 
