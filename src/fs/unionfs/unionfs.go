@@ -350,12 +350,8 @@ func (fs *filesystem) _cpdir(path string, v uint8, stat *fuse.Stat_t) (errc int)
 		return
 	}
 
+	/* Chown is best effort because we may not have privileges to perform this operation */
 	errc = dstfs.Chown(path, stat.Uid, stat.Gid)
-	if -fuse.ENOSYS == errc {
-		errc = 0
-	} else if 0 != errc {
-		return
-	}
 
 	errc = fs._cpxattr(path, v)
 	if -fuse.ENOSYS == errc {
@@ -421,12 +417,8 @@ func (fs *filesystem) cplink(path string, v uint8, stat *fuse.Stat_t) (errc int)
 		return
 	}
 
+	/* Chown is best effort because we may not have privileges to perform this operation */
 	errc = dstfs.Chown(path, stat.Uid, stat.Gid)
-	if -fuse.ENOSYS == errc {
-		errc = 0
-	} else if 0 != errc {
-		return
-	}
 
 	errc = fs._cpxattr(path, v)
 	if -fuse.ENOSYS == errc {
@@ -481,12 +473,8 @@ func (fs *filesystem) cpfile(path string, v uint8, stat *fuse.Stat_t, srcfh uint
 	}
 	defer dstfs.Release(path, dstfh)
 
+	/* Chown is best effort because we may not have privileges to perform this operation */
 	errc = dstfs.Chown(path, stat.Uid, stat.Gid)
-	if -fuse.ENOSYS == errc {
-		errc = 0
-	} else if 0 != errc {
-		return
-	}
 
 	errc = fs._cpxattr(path, v)
 	if -fuse.ENOSYS == errc {
