@@ -871,9 +871,9 @@ func mapFileAttributesToMode(attr uint32) (mode uint32) {
 	if 0 != attr&syscall.FILE_ATTRIBUTE_REPARSE_POINT {
 		mode = 0777 | fuse.S_IFLNK
 	} else if 0 != attr&syscall.FILE_ATTRIBUTE_DIRECTORY {
-		mode = 0777 | fuse.S_IFDIR
+		mode = 0755 | fuse.S_IFDIR
 	} else {
-		mode = 0666 | fuse.S_IFREG
+		mode = 0644 | fuse.S_IFREG
 		if 0 == attr&0x2000 /*FILE_ATTRIBUTE_NOT_CONTENT_INDEXED*/ {
 			/* abuse FILE_ATTRIBUTE_NOT_CONTENT_INDEXED to store the NOT executable condition */
 			mode |= 0111
