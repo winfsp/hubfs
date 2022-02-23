@@ -1062,7 +1062,7 @@ func (fs *filesystem) Truncate(path string, size int64, fh uint64) (errc int) {
 	}
 }
 
-func (fs *filesystem) Read(path string, buff []byte, ofst int64, fh uint64) (errc int) {
+func (fs *filesystem) Read(path string, buff []byte, ofst int64, fh uint64) (n int) {
 	_, v, fh := fs.getfile(path, fh)
 	if UNKNOWN == v {
 		return -fuse.EIO
@@ -1071,7 +1071,7 @@ func (fs *filesystem) Read(path string, buff []byte, ofst int64, fh uint64) (err
 	return fs.fslist[v].Read(path, buff, ofst, fh)
 }
 
-func (fs *filesystem) Write(path string, buff []byte, ofst int64, fh uint64) (errc int) {
+func (fs *filesystem) Write(path string, buff []byte, ofst int64, fh uint64) (n int) {
 	v, fh := fs.getwfile(path, fh)
 	if UNKNOWN == v {
 		return -fuse.EIO

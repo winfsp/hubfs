@@ -152,9 +152,9 @@ func (fs *shardfs) Truncate(path string, size int64, fh uint64) (errc int) {
 	return
 }
 
-func (fs *shardfs) Write(path string, buff []byte, ofst int64, fh uint64) (errc int) {
-	errc = fs.FileSystemInterface.Write(path, buff, ofst, fh)
-	if 0 == errc {
+func (fs *shardfs) Write(path string, buff []byte, ofst int64, fh uint64) (n int) {
+	n = fs.FileSystemInterface.Write(path, buff, ofst, fh)
+	if 0 <= n {
 		fs.initonce()
 	}
 	return

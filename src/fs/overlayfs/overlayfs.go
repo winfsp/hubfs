@@ -261,12 +261,12 @@ func (fs *filesystem) Truncate(path string, size int64, fh uint64) (errc int) {
 	return dstfs.Truncate(path, size, fh)
 }
 
-func (fs *filesystem) Read(path string, buff []byte, ofst int64, fh uint64) (errc int) {
+func (fs *filesystem) Read(path string, buff []byte, ofst int64, fh uint64) (n int) {
 	dstfs, path := fs.acquirefs(path, 0)
 	return dstfs.Read(path, buff, ofst, fh)
 }
 
-func (fs *filesystem) Write(path string, buff []byte, ofst int64, fh uint64) (errc int) {
+func (fs *filesystem) Write(path string, buff []byte, ofst int64, fh uint64) (n int) {
 	dstfs, path := fs.acquirefs(path, 0)
 	return dstfs.Write(path, buff, ofst, fh)
 }

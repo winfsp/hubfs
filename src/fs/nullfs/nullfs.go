@@ -98,11 +98,11 @@ func (fs *filesystem) Truncate(path string, size int64, fh uint64) (errc int) {
 	return -fuse.ENOENT
 }
 
-func (fs *filesystem) Read(path string, buff []byte, ofst int64, fh uint64) (errc int) {
+func (fs *filesystem) Read(path string, buff []byte, ofst int64, fh uint64) (n int) {
 	return -fuse.ENOENT
 }
 
-func (fs *filesystem) Write(path string, buff []byte, ofst int64, fh uint64) (errc int) {
+func (fs *filesystem) Write(path string, buff []byte, ofst int64, fh uint64) (n int) {
 	return -fuse.ENOENT
 }
 
