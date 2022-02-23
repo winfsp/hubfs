@@ -217,7 +217,7 @@ jobs:
 
           Start-Process -NoNewWindow .\hubfs.exe "-auth none -o uid=-1,rellinks,FileInfoTimeout=-1 X:"
           Start-Sleep 3
-          Push-Location X:\billziss-gh\hubfs\COMMIT
+          Push-Location X:\billziss-gh\hubfs\f05718b4db6a9e81f1fdab3d2ee0d3ae9d222f41
           if (-not (Select-String -Quiet -Pattern 092ec110-3e59-43c4-8169-4f747b7a5e35 -Path .github\workflows\test.yml)) {
               exit 1
           }
@@ -227,7 +227,7 @@ jobs:
 
           Start-Process -NoNewWindow .\hubfs.exe "-auth none -o uid=-1,rellinks,FileInfoTimeout=-1 github.com/billziss-gh/hubfs X:"
           Start-Sleep 3
-          Push-Location X:\COMMIT
+          Push-Location X:\f05718b4db6a9e81f1fdab3d2ee0d3ae9d222f41
           if (-not (Select-String -Quiet -Pattern 092ec110-3e59-43c4-8169-4f747b7a5e35 -Path .github\workflows\test.yml)) {
               exit 1
           }
@@ -245,10 +245,10 @@ jobs:
           sudo ./hubfs -auth none -o allow_other,default_permissions,attr_timeout=0 mnt &
           sleep 3
           ls -ld mnt
-          (cd mnt/billziss-gh/hubfs/COMMIT && grep 092ec110-3e59-43c4-8169-4f747b7a5e35 .github/workflows/test.yml)
+          (cd mnt/billziss-gh/hubfs/f05718b4db6a9e81f1fdab3d2ee0d3ae9d222f41 && grep 092ec110-3e59-43c4-8169-4f747b7a5e35 .github/workflows/test.yml)
           sudo umount mnt
 
           sudo ./hubfs -auth none -o allow_other,default_permissions,attr_timeout=0 github.com/billziss-gh/hubfs mnt &
           sleep 3
-          (cd mnt/COMMIT && grep 092ec110-3e59-43c4-8169-4f747b7a5e35 .github/workflows/test.yml)
+          (cd mnt/f05718b4db6a9e81f1fdab3d2ee0d3ae9d222f41 && grep 092ec110-3e59-43c4-8169-4f747b7a5e35 .github/workflows/test.yml)
           sudo umount mnt
