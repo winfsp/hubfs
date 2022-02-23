@@ -38,9 +38,9 @@ func newShardfs(topfs *hubfs, obs *obstack, fs fuse.FileSystemInterface) fuse.Fi
 
 func (fs *shardfs) initonce() {
 	fs.once.Do(func() {
-		errc, fh := fs.FileSystemInterface.Create(fs.keeppath, fuse.O_CREAT|fuse.O_RDWR, 0666)
+		errc, fh := fs.FileSystemInterface.Create(fs.keeppath, fuse.O_CREAT|fuse.O_RDWR, 0644)
 		if -fuse.ENOSYS == errc {
-			errc = fs.FileSystemInterface.Mknod(fs.keeppath, 0666, 0)
+			errc = fs.FileSystemInterface.Mknod(fs.keeppath, 0644, 0)
 			if 0 == errc {
 				errc, fh = fs.FileSystemInterface.Open(fs.keeppath, fuse.O_RDWR)
 			}

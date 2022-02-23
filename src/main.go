@@ -27,6 +27,7 @@ import (
 	"github.com/billziss-gh/golib/keyring"
 	libtrace "github.com/billziss-gh/golib/trace"
 	"github.com/billziss-gh/hubfs/fs/hubfs"
+	"github.com/billziss-gh/hubfs/fs/port"
 	"github.com/billziss-gh/hubfs/providers"
 )
 
@@ -249,6 +250,8 @@ func run() int {
 			warn("config error: %v", err)
 			return 1
 		}
+
+		port.Umask(0)
 
 		if !mount(client, uri.Path, mntpnt, config) {
 			return 1
