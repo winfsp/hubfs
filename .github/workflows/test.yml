@@ -108,12 +108,12 @@ jobs:
       - name: Build HUBFS (Windows)
         if: runner.os == 'Windows'
         run: |
-          .\make.cmd win
+          .\make.cmd dist
 
       - name: Build HUBFS (Linux / macOS)
         if: runner.os == 'Linux' || runner.os == 'macOS'
         run: |
-          make
+          make dist
 
       - name: Test HUBFS packages (Windows)
         if: runner.os == 'Windows'

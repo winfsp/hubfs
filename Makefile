@@ -46,8 +46,14 @@ racy:
 	cd src && \
 	go build -race -o ../hubfs$(ExeSuffix)
 
-.PHONY: win
-win: build
+.PHONY: test
+test:
+	cd src && \
+	go test -count=1 ./...
+
+.PHONY: dist
+dist: build
+ifeq ($(OS),Windows_NT)
 	powershell -NoProfile -NonInteractive -ExecutionPolicy Unrestricted \
 		"Compress-Archive -Force -Path hubfs.exe -DestinationPath .\hubfs-win-$(MyVersion).zip"
 	candle -nologo -arch x64 -pedantic \
@@ -76,6 +82,7 @@ win: build
 		/t http://timestamp.digicert.com \
 		hubfs-win-$(MyVersion).msi || \
 		echo "SIGNING FAILED! The product has been successfully built, but not signed." 1>&2
-
-.PHONY: lnx
-lnx: build
+else
+	rm -f hubfs-lnx-$(MyVersion).zip
+	zip hubfs-lnx-$(MyVersion).zip hubfs
+endif
