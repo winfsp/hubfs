@@ -59,8 +59,12 @@ usage: hubfs [options] [remote] mountpoint
   -version
         print version information
 ```
+The recommended FUSE options are:
 
-When running from the command line, the recommended FUSE options for Windows are `uid=-1,rellinks,FileInfoTimeout=-1`.
+- Windows: `uid=-1,gid=-1,rellinks,FileInfoTimeout=-1`
+- Linux/macOS: `uid=-1,gid=-1,default_permissions`
+
+(The `uid=-1,gid=-1` option specifies that the owner/group of HUBFS files is determined by the user/group that launches the file system.)
 
 ### File system representation
 
