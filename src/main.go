@@ -130,7 +130,7 @@ func run() int {
 	authmeth := "full"
 	authkey := ""
 	authonly := false
-	mntopt := default_mntopt
+	mntopt := mntopt{}
 	remote := "github.com"
 	mntpnt := ""
 	config := []string{"config.dir=:"}
@@ -232,13 +232,10 @@ func run() int {
 	}
 
 	if !authonly {
-		o := ""
-		if 0 != len(mntopt) {
-			o = strings.Join(mntopt, ",")
-		} else {
-			o = "\"\""
+		if 0 == len(mntopt) {
+			mntopt = default_mntopt
 		}
-		fmt.Printf("%s -o %s %s %s\n", progname, o, remote, mntpnt)
+		fmt.Printf("%s -o %s %s %s\n", progname, strings.Join(mntopt, ","), remote, mntpnt)
 
 		for _, m := range mntopt {
 			for _, s := range strings.Split(m, ",") {
