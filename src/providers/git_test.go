@@ -345,7 +345,7 @@ func init() {
 			token = ""
 		}
 		if "" == token {
-			token = os.Getenv("GITHUB_TOKEN")
+			token = os.Getenv("HUBFS_TOKEN")
 		}
 
 		repository, err = NewGitRepository(remote, token, caseins)

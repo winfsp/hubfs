@@ -173,7 +173,7 @@ func init() {
 			token = ""
 		}
 		if "" == token {
-			token = os.Getenv("GITHUB_TOKEN")
+			token = os.Getenv("HUBFS_TOKEN")
 		}
 
 		client, err = GetProvider("https://github.com").NewClient(token)

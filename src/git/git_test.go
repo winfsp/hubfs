@@ -160,7 +160,7 @@ func TestMain(m *testing.M) {
 		token = ""
 	}
 	if "" == token {
-		token = os.Getenv("GITHUB_TOKEN")
+		token = os.Getenv("HUBFS_TOKEN")
 	}
 
 	os.Exit(m.Run())

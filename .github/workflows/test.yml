@@ -117,24 +117,20 @@ jobs:
 
       - name: Test HUBFS packages (Windows)
         if: runner.os == 'Windows'
-        # It is not possible to run the git and providers tests, because of GitHub rate limiting.
-        # If we try to use GITHUB_TOKEN the tests fail because GitHub responds with an HTTP 403
-        # error and message "Resource not accessible by integration" (e.g. when trying to access
-        # /user).
+        env:
+          HUBFS_TOKEN: ${{ secrets.HUBFS_TOKEN }}
         run: |
           Set-Location src
           $env:CGO_ENABLED=0
-          go test -count=1 ./fs/...
+          go test -count=1 ./...
 
       - name: Test HUBFS packages (Linux / macOS)
         if: runner.os == 'Linux' || runner.os == 'macOS'
-        # It is not possible to run the git and providers tests, because of GitHub rate limiting.
-        # If we try to use GITHUB_TOKEN the tests fail because GitHub responds with an HTTP 403
-        # error and message "Resource not accessible by integration" (e.g. when trying to access
-        # /user).
+        env:
+          HUBFS_TOKEN: ${{ secrets.HUBFS_TOKEN }}
         run: |
           cd src
-          go test -count=1 ./fs/...
+          go test -count=1 ./...
 
       - name: Test component file systems (Windows)
         if: runner.os == 'Windows'
@@ -215,10 +211,12 @@ jobs:
 
       - name: Test HUBFS file system (Windows)
         if: runner.os == 'Windows'
+        env:
+          HUBFS_TOKEN: ${{ secrets.HUBFS_TOKEN }}
         run: |
           Set-PSDebug -Trace 1
 
-          Start-Process -NoNewWindow .\hubfs.exe "-auth none -o uid=-1,rellinks,FileInfoTimeout=-1 github.com/billziss-gh/hubfs/master X:"
+          Start-Process -NoNewWindow .\hubfs.exe "-auth token=$env:HUBFS_TOKEN -o uid=-1,rellinks,FileInfoTimeout=-1 github.com/billziss-gh/hubfs/master X:"
           Start-Sleep 3
           Push-Location X:\
           .\make.cmd dist
@@ -228,12 +226,14 @@ jobs:
 
       - name: Test HUBFS file system (Linux / macOS)
         if: runner.os == 'Linux' || runner.os == 'macOS'
+        env:
+          HUBFS_TOKEN: ${{ secrets.HUBFS_TOKEN }}
         run: |
           set -x
 
           mkdir mnt
 
-          sudo ./hubfs -auth none -o allow_other,default_permissions,attr_timeout=0 github.com/billziss-gh/hubfs/master mnt &
+          sudo ./hubfs -auth token=$HUBFS_TOKEN -o allow_other,default_permissions,attr_timeout=0 github.com/billziss-gh/hubfs/master mnt &
           sleep 3
           (cd mnt && make dist)
           sudo umount mnt
