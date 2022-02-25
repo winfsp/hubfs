@@ -191,7 +191,7 @@ jobs:
           set -x
 
           cd src
-          mkdir lo hi mnt
+          mkdir hi lo mnt
 
           go build _tools/ptfs.go
           go build _tools/unionfs.go
@@ -210,27 +210,18 @@ jobs:
           ../secfs.test/tools/bin/fsstress -d mnt -s $seed -n 5000 -p 10 -S
           sudo umount mnt
 
+          rm -rf hi lo
+          rmdir mnt
+
       - name: Test HUBFS file system (Windows)
         if: runner.os == 'Windows'
         run: |
           Set-PSDebug -Trace 1
 
-          Start-Process -NoNewWindow .\hubfs.exe "-auth none -o uid=-1,rellinks,FileInfoTimeout=-1 X:"
+          Start-Process -NoNewWindow .\hubfs.exe "-auth none -o uid=-1,rellinks,FileInfoTimeout=-1 github.com/billziss-gh/hubfs/master X:"
           Start-Sleep 3
-          Push-Location X:\billziss-gh\hubfs\f05718b4db6a9e81f1fdab3d2ee0d3ae9d222f41
-          if (-not (Select-String -Quiet -Pattern 092ec110-3e59-43c4-8169-4f747b7a5e35 -Path .github\workflows\test.yml)) {
-              exit 1
-          }
-          Stop-Process -Name hubfs
-          Start-Sleep 3
-          Pop-Location
-
-          Start-Process -NoNewWindow .\hubfs.exe "-auth none -o uid=-1,rellinks,FileInfoTimeout=-1 github.com/billziss-gh/hubfs X:"
-          Start-Sleep 3
-          Push-Location X:\f05718b4db6a9e81f1fdab3d2ee0d3ae9d222f41
-          if (-not (Select-String -Quiet -Pattern 092ec110-3e59-43c4-8169-4f747b7a5e35 -Path .github\workflows\test.yml)) {
-              exit 1
-          }
+          Push-Location X:\
+          .\make.cmd dist
           Stop-Process -Name hubfs
           Start-Sleep 3
           Pop-Location
@@ -242,13 +233,9 @@ jobs:
 
           mkdir mnt
 
-          sudo ./hubfs -auth none -o allow_other,default_permissions,attr_timeout=0 mnt &
+          sudo ./hubfs -auth none -o allow_other,default_permissions,attr_timeout=0 github.com/billziss-gh/hubfs/master mnt &
           sleep 3
-          ls -ld mnt
-          (cd mnt/billziss-gh/hubfs/f05718b4db6a9e81f1fdab3d2ee0d3ae9d222f41 && grep 092ec110-3e59-43c4-8169-4f747b7a5e35 .github/workflows/test.yml)
+          (cd mnt && make dist)
           sudo umount mnt
 
-          sudo ./hubfs -auth none -o allow_other,default_permissions,attr_timeout=0 github.com/billziss-gh/hubfs mnt &
-          sleep 3
-          (cd mnt/f05718b4db6a9e81f1fdab3d2ee0d3ae9d222f41 && grep 092ec110-3e59-43c4-8169-4f747b7a5e35 .github/workflows/test.yml)
-          sudo umount mnt
+          rmdir mnt
