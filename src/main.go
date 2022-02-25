@@ -39,9 +39,11 @@ var (
 	MyCopyright      = "2021 Bill Zissimopoulos"
 )
 
+var progname = strings.TrimSuffix(filepath.Base(os.Args[0]), ".exe")
+
 func warn(format string, a ...interface{}) {
 	format = "%s: " + format + "\n"
-	a = append([]interface{}{strings.TrimSuffix(filepath.Base(os.Args[0]), ".exe")}, a...)
+	a = append([]interface{}{progname}, a...)
 	fmt.Fprintf(os.Stderr, format, a...)
 }
 
@@ -114,18 +116,27 @@ func mount(client providers.Client, prefix string, mntpnt string, config []strin
 }
 
 func run() int {
+	default_mntopt := mntopt{}
+	switch runtime.GOOS {
+	case "windows":
+		default_mntopt = mntopt{"uid=-1", "gid=-1", "rellinks", "FileInfoTimeout=-1"}
+	case "linux":
+		default_mntopt = mntopt{"uid=-1", "gid=-1", "default_permissions"}
+	case "darwin":
+		default_mntopt = mntopt{"uid=-1", "gid=-1", "default_permissions", "noapplexattr"}
+	}
+
 	printver := false
 	authmeth := "full"
 	authkey := ""
 	authonly := false
-	mntopt := mntopt{}
+	mntopt := default_mntopt
 	remote := "github.com"
 	mntpnt := ""
 	config := []string{"config.dir=:"}
 
 	flag.Usage = func() {
-		fmt.Fprintf(os.Stderr, "usage: %s [options] [remote] mountpoint\n\n",
-			strings.TrimSuffix(filepath.Base(os.Args[0]), ".exe"))
+		fmt.Fprintf(os.Stderr, "usage: %s [options] [remote] mountpoint\n\n", progname)
 		flag.PrintDefaults()
 	}
 
@@ -139,7 +150,7 @@ func run() int {
 			"- none      do not use auth token even if present")
 	flag.StringVar(&authkey, "authkey", authkey, "`name` of key that stores auth token in system keyring")
 	flag.BoolVar(&authonly, "authonly", authonly, "perform auth only; do not mount")
-	flag.Var(&mntopt, "o", "FUSE mount `options`")
+	flag.Var(&mntopt, "o", "FUSE mount `options`\n(default: "+strings.Join(default_mntopt, ",")+")")
 
 	flag.Parse()
 
@@ -221,6 +232,14 @@ func run() int {
 	}
 
 	if !authonly {
+		o := ""
+		if 0 != len(mntopt) {
+			o = strings.Join(mntopt, ",")
+		} else {
+			o = "\"\""
+		}
+		fmt.Printf("%s -o %s %s %s\n", progname, o, remote, mntpnt)
+
 		for _, m := range mntopt {
 			for _, s := range strings.Split(m, ",") {
 				if "windows" != runtime.GOOS {
