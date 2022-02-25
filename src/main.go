@@ -147,7 +147,8 @@ func run() int {
 			"- full      perform interactive auth if token not present (default)\n"+
 			"- required  auth token required to be present\n"+
 			"- optional  auth token will be used if present\n"+
-			"- none      do not use auth token even if present")
+			"- none      do not use auth token even if present\n"+
+			"- token=T   use specified auth token T; do not use system keyring")
 	flag.StringVar(&authkey, "authkey", authkey, "`name` of key that stores auth token in system keyring")
 	flag.BoolVar(&authonly, "authonly", authonly, "perform auth only; do not mount")
 	flag.Var(&mntopt, "o", "FUSE mount `options`\n(default: "+strings.Join(default_mntopt, ",")+")")
@@ -183,6 +184,9 @@ func run() int {
 			return 2
 		}
 	default:
+		if strings.HasPrefix(authmeth, "token=") {
+			break
+		}
 		flag.Usage()
 		return 2
 	}
@@ -225,6 +229,10 @@ func run() int {
 		}
 	case "none":
 		client, err = provider.NewClient("")
+	default:
+		if strings.HasPrefix(authmeth, "token=") {
+			client, err = provider.NewClient(strings.TrimPrefix(authmeth, "token="))
+		}
 	}
 	if nil != err {
 		warn("client error: %v", err)
