@@ -126,6 +126,7 @@ func run() int {
 		default_mntopt = mntopt{"uid=-1", "gid=-1", "default_permissions", "noapplexattr"}
 	}
 
+	debug := false
 	printver := false
 	authmeth := "full"
 	authkey := ""
@@ -140,6 +141,7 @@ func run() int {
 		flag.PrintDefaults()
 	}
 
+	flag.BoolVar(&debug, "d", debug, "debug output")
 	flag.BoolVar(&printver, "version", printver, "print version information")
 	flag.StringVar(&authmeth, "auth", "",
 		"`method` is from list below; auth tokens are stored in system keyring\n"+
@@ -189,6 +191,11 @@ func run() int {
 		}
 		flag.Usage()
 		return 2
+	}
+
+	if debug {
+		libtrace.Verbose = true
+		libtrace.Pattern = "*,github.com/billziss-gh/hubfs/*,github.com/billziss-gh/hubfs/fs/*"
 	}
 
 	uri, err := url.Parse(remote)
@@ -245,6 +252,10 @@ func run() int {
 		}
 		fmt.Printf("%s -o %s %s %s\n", progname, strings.Join(mntopt, ","), remote, mntpnt)
 
+		if debug {
+			mntopt = append(mntopt, "debug")
+		}
+
 		for _, m := range mntopt {
 			for _, s := range strings.Split(m, ",") {
 				if "windows" != runtime.GOOS {
@@ -258,14 +269,6 @@ func run() int {
 					}
 				}
 				config = append(config, s)
-			}
-		}
-
-		for _, s := range config {
-			if "debug" == s {
-				libtrace.Verbose = true
-				libtrace.Pattern = "*,github.com/billziss-gh/hubfs/*,github.com/billziss-gh/hubfs/fs/*"
-				break
 			}
 		}
 
