@@ -27,6 +27,23 @@ import (
 )
 
 func New(c Config) fuse.FileSystemInterface {
+	/* if have Prefix, clean it up and make sure it does not have more than 3 components */
+	c.Prefix = pathutil.Clean(c.Prefix)
+	switch c.Prefix {
+	case "/", ".":
+		c.Prefix = ""
+	}
+	slashes := 0
+	for i := 0; len(c.Prefix) > i; i++ {
+		if '/' == c.Prefix[i] {
+			slashes++
+			if 4 == slashes {
+				c.Prefix = c.Prefix[:i]
+				break
+			}
+		}
+	}
+
 	if c.Overlay {
 		return newOverlay(c)
 	} else {
@@ -36,17 +53,17 @@ func New(c Config) fuse.FileSystemInterface {
 
 func newOverlay(c Config) fuse.FileSystemInterface {
 	scope := c.Prefix
+	scopeSlashes := strings.Count(c.Prefix, "/")
 	caseins := c.Caseins
 
 	topfs := new(Config{
 		Client:  c.Client,
-		Prefix:  "",
+		Prefix:  c.Prefix,
 		Caseins: c.Caseins,
 	}).(*hubfs)
 
 	split := func(path string) (string, string) {
-		path = pathutil.Join(scope, path)
-		slashes := 0
+		slashes := scopeSlashes
 		for i := 0; len(path) > i; i++ {
 			if '/' == path[i] {
 				slashes++
@@ -94,7 +111,7 @@ func newOverlay(c Config) fuse.FileSystemInterface {
 		upfs := ptfs.New(root)
 		lofs := new(Config{
 			Client:  topfs.client,
-			Prefix:  prefix,
+			Prefix:  pathutil.Join(scope, prefix),
 			Caseins: caseins,
 		})
 		unfs := unionfs.New(unionfs.Config{

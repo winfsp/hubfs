@@ -144,7 +144,7 @@ func (fs *hubfs) getattr(obs *obstack, entry providers.TreeEntry, path string, s
 			stat.Size = int64(len(target))
 		case 0160000 /* submodule */ :
 			target = entry.Target()
-			path = strings.Join(split(pathutil.Join(fs.prefix, path))[3:], "/")
+			path = repoPath(pathutil.Join(fs.prefix, path))
 			module, err := obs.repository.GetModule(obs.ref, path, true)
 			module = strings.TrimPrefix(module, strings.TrimSuffix(fs.prefix, "/"))
 			if "" != module {
@@ -479,6 +479,19 @@ func split(path string) []string {
 		return []string{}
 	}
 	return comp
+}
+
+func repoPath(path string) string {
+	slashes := 0
+	for i := 0; len(path) > i; i++ {
+		if '/' == path[i] {
+			slashes++
+			if 4 == slashes {
+				return path[i+1:]
+			}
+		}
+	}
+	return ""
 }
 
 func trace(vals ...interface{}) func(vals ...interface{}) {

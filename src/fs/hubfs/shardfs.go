@@ -14,6 +14,10 @@
 package hubfs
 
 import (
+	pathutil "path"
+	"path/filepath"
+	"runtime"
+	"strings"
 	"sync"
 
 	"github.com/billziss-gh/cgofuse/fuse"
@@ -100,6 +104,19 @@ func (fs *shardfs) Symlink(target string, newpath string) (errc int) {
 	errc = fs.FileSystemInterface.Symlink(target, newpath)
 	if 0 == errc {
 		fs.initonce()
+	}
+	return
+}
+
+func (fs *shardfs) Readlink(path string) (errc int, target string) {
+	errc, target = fs.FileSystemInterface.Readlink(path)
+	if 0 == errc {
+		if t, e := filepath.Rel(fs.topfs.prefix, target); nil == e {
+			if "windows" == runtime.GOOS {
+				target = strings.ReplaceAll(t, `\`, `/`)
+			}
+			target = pathutil.Join("/", target)
+		}
 	}
 	return
 }
