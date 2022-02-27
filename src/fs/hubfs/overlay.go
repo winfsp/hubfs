@@ -68,17 +68,27 @@ func newOverlay(c Config) fuse.FileSystemInterface {
 			if '/' == path[i] {
 				slashes++
 				if 4 == slashes {
-					return path[:i], path[i:]
+					if 0 == i {
+						return "/", path
+					} else {
+						return path[:i], path[i:]
+					}
 				}
 			}
 		}
-		if 3 == slashes {
+		if 3 == slashes && "/" != path {
 			return path, "/"
 		}
 		return "", path
 	}
 
 	newfs := func(prefix string) fuse.FileSystemInterface {
+		defer func() {
+			if r := recover(); nil != r {
+				tracef("prefix=%q !PANIC:%v", prefix, r)
+			}
+		}()
+
 		errc, obs := topfs.open(prefix)
 		if 0 != errc {
 			return nil

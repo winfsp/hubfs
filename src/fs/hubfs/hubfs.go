@@ -58,6 +58,11 @@ func new(c Config) fuse.FileSystemInterface {
 }
 
 func (fs *hubfs) openex(path string, norm bool) (errc int, res *obstack, lst []string) {
+	if strings.HasSuffix(path, "/.") {
+		errc = -fuse.ENOENT
+		return
+	}
+
 	lst = split(pathutil.Join(fs.prefix, path))
 	obs := &obstack{}
 	var err error
@@ -179,10 +184,6 @@ func (fs *hubfs) Readpath(path string) (errc int, target string) {
 
 func (fs *hubfs) Getattr(path string, stat *fuse.Stat_t, fh uint64) (errc int) {
 	defer trace(path, fh)(&errc, stat)
-
-	if strings.HasSuffix(path, "/.") {
-		return -fuse.ENOENT
-	}
 
 	errc, obs := fs.open(path)
 	if 0 != errc {
