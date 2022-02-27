@@ -129,7 +129,7 @@ func newOverlay(c Config) fuse.FileSystemInterface {
 			Caseins: caseins,
 		})
 
-		return newShardfs(topfs, obs, unfs)
+		return newShardfs(topfs, prefix, obs, unfs)
 	}
 
 	return overlayfs.New(overlayfs.Config{

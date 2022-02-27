@@ -26,15 +26,17 @@ import (
 type shardfs struct {
 	fuse.FileSystemInterface
 	topfs    *hubfs
+	prefix   string
 	obs      *obstack
 	keeppath string
 	once     sync.Once
 }
 
-func newShardfs(topfs *hubfs, obs *obstack, fs fuse.FileSystemInterface) fuse.FileSystemInterface {
+func newShardfs(topfs *hubfs, prefix string, obs *obstack, fs fuse.FileSystemInterface) fuse.FileSystemInterface {
 	return &shardfs{
 		FileSystemInterface: fs,
 		topfs:               topfs,
+		prefix:              prefix,
 		obs:                 obs,
 		keeppath:            "/.keep",
 	}
@@ -110,12 +112,13 @@ func (fs *shardfs) Symlink(target string, newpath string) (errc int) {
 
 func (fs *shardfs) Readlink(path string) (errc int, target string) {
 	errc, target = fs.FileSystemInterface.Readlink(path)
-	if 0 == errc {
-		if t, e := filepath.Rel(fs.topfs.prefix, target); nil == e {
+	if 0 == errc && 0 < len(target) && "/" == target[:1] {
+		target = strings.TrimPrefix(target, strings.TrimSuffix(fs.topfs.prefix, "/"))
+		if t, e := filepath.Rel(pathutil.Dir(pathutil.Join(fs.prefix, path)), target); nil == e {
 			if "windows" == runtime.GOOS {
-				target = strings.ReplaceAll(t, `\`, `/`)
+				t = strings.ReplaceAll(t, `\`, `/`)
 			}
-			target = pathutil.Join("/", target)
+			target = t
 		}
 	}
 	return
