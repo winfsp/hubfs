@@ -50,21 +50,20 @@ usage: hubfs [options] [remote] mountpoint
         - required  auth token required to be present
         - optional  auth token will be used if present
         - none      do not use auth token even if present
+        - token=T   use specified auth token T; do not use system keyring
   -authkey name
         name of key that stores auth token in system keyring
   -authonly
         perform auth only; do not mount
+  -d    debug output
   -o options
         FUSE mount options
+        (default: uid=-1,gid=-1,rellinks,FileInfoTimeout=-1)
   -version
         print version information
 ```
-The recommended FUSE options are:
 
-- Windows: `uid=-1,gid=-1,rellinks,FileInfoTimeout=-1`
-- Linux/macOS: `uid=-1,gid=-1,default_permissions`
-
-(The `uid=-1,gid=-1` option specifies that the owner/group of HUBFS files is determined by the user/group that launches the file system.)
+(The default FUSE mount options depend on the OS. The `uid=-1,gid=-1` option specifies that the owner/group of HUBFS files is determined by the user/group that launches the file system. This works on Windows, Linux and macOS.)
 
 ### File system representation
 
@@ -80,7 +79,7 @@ By default HUBFS presents the following file system hierarchy: / *owner* / *repo
 
 HUBFS interprets submodules as symlinks. These submodules can be followed if they point to other GitHub repositories. General repository symlinks should work as well. (On Windows you must use the FUSE option `rellinks` for this to work correctly.)
 
-With release 2022 Beta2 HUBFS repository directories are now writable. This is implemented as a union file system that overlays a read-write local file system over the read-only Git content. This scheme allows files to be edited and builds to be performed. A special file named `.keep` is created at the *ref* root (full path: / *owner* / *repository* / *ref* / `.keep`). When the edit/build modifications are no longer required the `.keep` file may be deleted and the *ref* root will be garbage collected when not in use (i.e. when no files are open in it -- having a terminal window open with a current directory inside a *ref* root counts as an open file and the *ref* will not be garbage collected).
+With release 2022 Beta2 HUBFS *ref* directories are now writable. This is implemented as a union file system that overlays a read-write local file system over the read-only Git content. This scheme allows files to be edited and builds to be performed. A special file named `.keep` is created at the *ref* root (full path: / *owner* / *repository* / *ref* / `.keep`). When the edit/build modifications are no longer required the `.keep` file may be deleted and the *ref* root will be garbage collected when not in use (i.e. when no files are open in it -- having a terminal window open with a current directory inside a *ref* root counts as an open file and the *ref* will not be garbage collected).
 
 ### Windows integration
 
