@@ -19,10 +19,15 @@ endif
 
 ExeSuffix=
 ifeq ($(OS),Windows_NT)
+	GoBuild=go build
 	ExeSuffix=.exe
 endif
 ifeq ($(OS),Linux)
+	GoBuild=go build
 	export CGO_CFLAGS=-include $(dir $(realpath $(lastword $(MAKEFILE_LIST))))ext/glibc-compat/glibc-2.17.h
+endif
+ifeq ($(OS),Darwin)
+	GoBuild=../gobuild.mac
 endif
 
 .PHONY: default
@@ -31,7 +36,7 @@ default: build
 .PHONY: build
 build:
 	cd src && \
-	go build \
+	$(GoBuild) \
 		-ldflags "-s -w \
 			-X \"main.MyVersion=$(subst $\",,$(MyVersion))\" \
 			-X \"main.MyProductVersion=$(subst $\",,$(MyProductVersion))\" \
@@ -82,7 +87,12 @@ ifeq ($(OS),Windows_NT)
 		/t http://timestamp.digicert.com \
 		hubfs-win-$(MyVersion).msi || \
 		echo "SIGNING FAILED! The product has been successfully built, but not signed." 1>&2
-else
+endif
+ifeq ($(OS),Linux)
 	rm -f hubfs-lnx-$(MyVersion).zip
 	zip hubfs-lnx-$(MyVersion).zip hubfs
+endif
+ifeq ($(OS),Darwin)
+	rm -f hubfs-mac-$(MyVersion).zip
+	zip hubfs-mac-$(MyVersion).zip hubfs
 endif

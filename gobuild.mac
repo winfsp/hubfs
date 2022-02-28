@@ -1,0 +1,23 @@
+#!/bin/sh
+
+set -e
+
+for target; do true; done
+
+if [[ -n $GOARCHLIST ]]; then
+    targetlist=
+    for arch in $GOARCHLIST; do
+        echo GOOS=darwin GOARCH=$arch CGO_ENABLED=1 go build $@
+        GOOS=darwin GOARCH=$arch CGO_ENABLED=1 go build "$@"
+        mv $target $target-$arch
+        targetlist="$targetlist $target-$arch"
+    done
+
+    echo lipo -create -output $target $targetlist
+    lipo -create -output $target $targetlist
+
+    rm $targetlist
+else
+    echo GOOS=darwin GOARCH= CGO_ENABLED=1 go build $@
+    GOOS=darwin GOARCH= CGO_ENABLED=1 go build "$@"
+fi
