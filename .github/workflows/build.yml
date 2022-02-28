@@ -1,0 +1,71 @@
+name: build
+
+on:
+  push:
+    branches:
+      - "*"
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
+      fail-fast: false
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          submodules: recursive
+
+      - name: Install go
+        uses: actions/setup-go@v2
+        with:
+          stable: true
+          go-version: 1.17.*
+
+      - name: Install winfsp and winfsp-tests (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          $releases = Invoke-WebRequest https://api.github.com/repos/billziss-gh/winfsp/releases | `
+              ConvertFrom-Json
+
+          $asseturi = $releases[0].assets.browser_download_url | `
+              Where-Object { $_ -match "winfsp-.*\.msi" }
+          Invoke-WebRequest -Uri $asseturi -Out winfsp.msi
+          Start-Process -NoNewWindow -Wait msiexec "/i winfsp.msi /qn"
+
+      - name: Install FUSE and secfs.test (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get -qq install libfuse-dev
+          sudo apt-get -qq install libacl1-dev
+
+      - name: Install FUSE and secfs.test (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          # requires macos-10.15; does not work on macos-latest
+          # see https://github.com/actions/virtual-environments/issues/4731
+          brew install macfuse
+
+      - name: Build HUBFS (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          .\make.cmd dist
+
+      - name: Build HUBFS (Linux / macOS)
+        if: runner.os == 'Linux' || runner.os == 'macOS'
+        run: |
+          make dist
+
+      - name: Upload redistributables
+        uses: actions/upload-artifact@v2
+        with:
+          name: Redistributables
+          path: |
+            hubfs-*-*.msi
+            hubfs-*-*.zip
