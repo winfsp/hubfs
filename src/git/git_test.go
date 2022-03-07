@@ -21,7 +21,7 @@ import (
 	libtrace "github.com/billziss-gh/golib/trace"
 )
 
-const remote = "https://github.com/billziss-gh/hubfs"
+const remote = "https://github.com/winfsp/hubfs"
 const refName = "refs/heads/master"
 
 const hash0 = "90f898ae1f8d3c976f9224d92e3b08d7813e961e"

@@ -21,7 +21,7 @@ import (
 	"github.com/billziss-gh/golib/keyring"
 )
 
-const ownerName = "billziss-gh"
+const ownerName = "winfsp"
 const repositoryName = "hubfs"
 
 var client Client
