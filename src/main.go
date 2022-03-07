@@ -36,7 +36,7 @@ var (
 	MyProductVersion = "PRDVER"
 	MyProductName    = "hubfs"
 	MyDescription    = "File system for GitHub"
-	MyCopyright      = "2021 Bill Zissimopoulos"
+	MyCopyright      = "2021-2022 Bill Zissimopoulos"
 )
 
 var progname = strings.TrimSuffix(filepath.Base(os.Args[0]), ".exe")
@@ -47,15 +47,15 @@ func warn(format string, a ...interface{}) {
 	fmt.Fprintf(os.Stderr, format, a...)
 }
 
-type mntopt []string
+type optlist []string
 
 // String implements flag.Value.String.
-func (mntopt *mntopt) String() string {
+func (mntopt *optlist) String() string {
 	return ""
 }
 
 // Set implements flag.Value.Set.
-func (mntopt *mntopt) Set(s string) error {
+func (mntopt *optlist) Set(s string) error {
 	*mntopt = append(*mntopt, s)
 	return nil
 }
@@ -116,14 +116,14 @@ func mount(client providers.Client, prefix string, mntpnt string, config []strin
 }
 
 func run() int {
-	default_mntopt := mntopt{}
+	default_mntopt := optlist{}
 	switch runtime.GOOS {
 	case "windows":
-		default_mntopt = mntopt{"uid=-1", "gid=-1", "rellinks", "FileInfoTimeout=-1"}
+		default_mntopt = optlist{"uid=-1", "gid=-1", "rellinks", "FileInfoTimeout=-1"}
 	case "linux":
-		default_mntopt = mntopt{"uid=-1", "gid=-1", "default_permissions"}
+		default_mntopt = optlist{"uid=-1", "gid=-1", "default_permissions"}
 	case "darwin":
-		default_mntopt = mntopt{"uid=-1", "gid=-1", "default_permissions", "noapplexattr"}
+		default_mntopt = optlist{"uid=-1", "gid=-1", "default_permissions", "noapplexattr"}
 	}
 
 	debug := false
@@ -131,7 +131,8 @@ func run() int {
 	authmeth := "full"
 	authkey := ""
 	authonly := false
-	mntopt := mntopt{}
+	filter := optlist{}
+	mntopt := optlist{}
 	remote := "github.com"
 	mntpnt := ""
 	config := []string{"config.dir=:"}
@@ -153,6 +154,12 @@ func run() int {
 			"- token=T   use specified auth token T; do not use system keyring")
 	flag.StringVar(&authkey, "authkey", authkey, "`name` of key that stores auth token in system keyring")
 	flag.BoolVar(&authonly, "authonly", authonly, "perform auth only; do not mount")
+	flag.Var(&filter, "filter",
+		"list of `rules` that determine repo availability\n"+
+			"- list form: rule1,rule2,...\n"+
+			"- rule form: [+-]owner or [+-]owner/repo\n"+
+			"- rule is include (+) or exclude (-) (default: include)\n"+
+			"- rule owner/repo can use wildcards for pattern matching")
 	flag.Var(&mntopt, "o", "FUSE mount `options`\n(default: "+strings.Join(default_mntopt, ",")+")")
 
 	flag.Parse()
@@ -269,6 +276,12 @@ func run() int {
 					}
 				}
 				config = append(config, s)
+			}
+		}
+
+		for _, f := range filter {
+			for _, s := range strings.Split(f, ",") {
+				config = append(config, "config._filter="+s)
 			}
 		}
 

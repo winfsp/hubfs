@@ -87,6 +87,7 @@ type githubClient struct {
 	lock       sync.Mutex
 	cache      *cache
 	owners     *cacheImap
+	filter     *filterType
 }
 
 type githubOwner struct {
@@ -172,6 +173,11 @@ func (client *githubClient) SetConfig(config []string) ([]string, error) {
 			} else {
 				client.caseins = false
 			}
+		case configValue(s, "config._filter=", &v):
+			if nil == client.filter {
+				client.filter = &filterType{}
+			}
+			client.filter.addRule(v)
 		default:
 			res = append(res, s)
 		}
@@ -280,6 +286,10 @@ func (client *githubClient) OpenOwner(name string) (Owner, error) {
 	var res *githubOwner
 	var err error
 
+	if nil != client.filter && !client.filter.match(name) {
+		return nil, ErrNotFound
+	}
+
 	client.lock.Lock()
 	if nil != client.owners {
 		item, ok := client.owners.Get(name)
@@ -336,6 +346,9 @@ func (client *githubClient) ensureRepositories(owner *githubOwner, fn func() err
 	if nil == owner.repositories {
 		owner.repositories = client.cache.newCacheImap()
 		for _, elm := range repositories {
+			if nil != client.filter && !client.filter.match(owner.FName+"/"+elm.FName) {
+				continue
+			}
 			owner.repositories.Set(elm.FName, &elm.MapItem, true)
 			client.cache.touchCacheItem(&elm.cacheItem, 0)
 		}
