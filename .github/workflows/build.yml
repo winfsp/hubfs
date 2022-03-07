@@ -31,7 +31,7 @@ jobs:
       - name: Install winfsp and winfsp-tests (Windows)
         if: runner.os == 'Windows'
         run: |
-          $releases = Invoke-WebRequest https://api.github.com/repos/billziss-gh/winfsp/releases | `
+          $releases = Invoke-WebRequest https://api.github.com/repos/winfsp/winfsp/releases | `
               ConvertFrom-Json
 
           $asseturi = $releases[0].assets.browser_download_url | `

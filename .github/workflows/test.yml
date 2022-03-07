@@ -31,7 +31,7 @@ jobs:
       - name: Install winfsp and winfsp-tests (Windows)
         if: runner.os == 'Windows'
         run: |
-          $releases = Invoke-WebRequest https://api.github.com/repos/billziss-gh/winfsp/releases | `
+          $releases = Invoke-WebRequest https://api.github.com/repos/winfsp/winfsp/releases | `
               ConvertFrom-Json
 
           $asseturi = $releases[0].assets.browser_download_url | `
@@ -217,7 +217,7 @@ jobs:
         run: |
           Set-PSDebug -Trace 1
 
-          Start-Process -NoNewWindow .\hubfs.exe "-auth token=$env:HUBFS_TOKEN github.com/billziss-gh X:"
+          Start-Process -NoNewWindow .\hubfs.exe "-auth token=$env:HUBFS_TOKEN github.com/winfsp X:"
           Start-Sleep 3
           Push-Location X:\hubfs\master
           .\make.cmd dist
@@ -234,7 +234,7 @@ jobs:
 
           mkdir mnt
 
-          ./hubfs -auth token=$HUBFS_TOKEN github.com/billziss-gh mnt &
+          ./hubfs -auth token=$HUBFS_TOKEN github.com/winfsp mnt &
           sleep 3
           (cd mnt/hubfs/master && make dist)
           sudo umount mnt
