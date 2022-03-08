@@ -217,9 +217,9 @@ jobs:
         run: |
           Set-PSDebug -Trace 1
 
-          Start-Process -NoNewWindow .\hubfs.exe "-auth token=$env:HUBFS_TOKEN github.com/winfsp X:"
+          Start-Process -NoNewWindow .\hubfs.exe "-auth token=$env:HUBFS_TOKEN github.com X:"
           Start-Sleep 3
-          Push-Location X:\hubfs\master
+          Push-Location X:\winfsp\hubfs\master
           .\make.cmd dist
           Stop-Process -Name hubfs
           Start-Sleep 3
@@ -234,9 +234,9 @@ jobs:
 
           mkdir mnt
 
-          ./hubfs -auth token=$HUBFS_TOKEN github.com/winfsp mnt &
+          ./hubfs -auth token=$HUBFS_TOKEN github.com mnt &
           sleep 3
-          (cd mnt/hubfs/master && make dist)
+          (cd mnt/winfsp/hubfs/master && make dist)
           sudo umount mnt
 
           rmdir mnt
