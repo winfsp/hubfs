@@ -85,7 +85,7 @@ By default HUBFS presents the following file system hierarchy: / *owner* / *repo
 
 HUBFS interprets submodules as symlinks. These submodules can be followed if they point to other GitHub repositories. General repository symlinks should work as well. (On Windows you must use the FUSE option `rellinks` for this to work correctly.)
 
-With release 2022 Beta2 HUBFS *ref* directories are now writable. This is implemented as a union file system that overlays a read-write local file system over the read-only Git content. This scheme allows files to be edited and builds to be performed. A special file named `.keep` is created at the *ref* root (full path: / *owner* / *repository* / *ref* / `.keep`). When the edit/build modifications are no longer required the `.keep` file may be deleted and the *ref* root will be garbage collected when not in use (i.e. when no files are open in it -- having a terminal window open with a current directory inside a *ref* root counts as an open file and the *ref* will not be garbage collected).
+With release 2022 Beta1 HUBFS *ref* directories are now writable. This is implemented as a union file system that overlays a read-write local file system over the read-only Git content. This scheme allows files to be edited and builds to be performed. A special file named `.keep` is created at the *ref* root (full path: / *owner* / *repository* / *ref* / `.keep`). When the edit/build modifications are no longer required the `.keep` file may be deleted and the *ref* root will be garbage collected when not in use (i.e. when no files are open in it -- having a terminal window open with a current directory inside a *ref* root counts as an open file and the *ref* will not be garbage collected).
 
 ### Windows integration
 

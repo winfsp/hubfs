@@ -1,8 +1,8 @@
 # Makefile
 
 MyBuildNumber = $(shell date +%y%j)
-MyVersion = 0.2.$(MyBuildNumber)
-MyProductVersion = "2022 Beta2"
+MyVersion = 1.0.$(MyBuildNumber)
+MyProductVersion = "2022 Beta1"
 MyProductStage = "Beta"
 
 MyProductName = "HUBFS"
