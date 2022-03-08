@@ -94,6 +94,7 @@ type githubOwner struct {
 	cacheItem
 	repositories *cacheImap
 	FName        string `json:"login"`
+	FType        string `json:"type"`
 }
 
 type githubRepository struct {
@@ -253,12 +254,14 @@ func (client *githubClient) getRepositoryPage(path string) ([]*githubRepository,
 	return content, nil
 }
 
-func (client *githubClient) getRepositories(owner string) (res []*githubRepository, err error) {
+func (client *githubClient) getRepositories(owner string, isorg bool) (res []*githubRepository, err error) {
 	defer trace(owner)(&err)
 
 	var path string
-	if client.login == owner {
-		path = "/user/repos?visibility=all&affiliation=owner,organization_member&per_page=100"
+	if isorg {
+		path = fmt.Sprintf("/orgs/%s/repos?type=all&per_page=100", owner)
+	} else if client.login == owner {
+		path = "/user/repos?visibility=all&affiliation=owner&per_page=100"
 	} else {
 		path = fmt.Sprintf("/users/%s/repos?type=owner&per_page=100", owner)
 	}
@@ -337,7 +340,7 @@ func (client *githubClient) ensureRepositories(owner *githubOwner, fn func() err
 	}
 	client.lock.Unlock()
 
-	repositories, err := client.getRepositories(owner.FName)
+	repositories, err := client.getRepositories(owner.FName, "Organization" == owner.FType)
 	if nil != err {
 		return err
 	}
