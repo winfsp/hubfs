@@ -6,8 +6,8 @@ HUBFS &middot; File System for GitHub
 </h1>
 
 <p align="center">
-<a href="https://github.com/billziss-gh/hubfs/releases">
-<img src="https://img.shields.io/github/release/billziss-gh/hubfs/all.svg?label=Download&colorB=e52e4b&style=for-the-badge"/>
+<a href="https://github.com/winfsp/hubfs/releases">
+<img src="https://img.shields.io/github/release/winfsp/hubfs/all.svg?label=Download&colorB=e52e4b&style=for-the-badge"/>
 </a>
 
 HUBFS is a file system for GitHub and Git. Git repositories and their contents are represented as regular directories and files and are accessible by any application, without the application having any knowledge that it is really accessing a remote Git repository. The repositories are writable and allow editing files and running build operations.
@@ -56,6 +56,12 @@ usage: hubfs [options] [remote] mountpoint
   -authonly
         perform auth only; do not mount
   -d    debug output
+  -filter rules
+        list of rules that determine repo availability
+        - list form: rule1,rule2,...
+        - rule form: [+-]owner or [+-]owner/repo
+        - rule is include (+) or exclude (-) (default: include)
+        - rule owner/repo can use wildcards for pattern matching
   -o options
         FUSE mount options
         (default: uid=-1,gid=-1,rellinks,FileInfoTimeout=-1)
@@ -123,13 +129,11 @@ HUBFS fetches objects with a depth of 1 and a filter of `tree:0`. This ensures t
 
 ## Security issues
 
-- Some applications insist on accessing files or directories from the root of the HUBFS file system (especially on Windows). Some of these accesses are disallowed by HUBFS (e.g. accesses for `.git`, `HEAD` or `autorun.inf`). Others are allowed which can create the possibility of a security issue for some applications, because anyone can create a username on GitHub that matches the name of a file that an application is looking for.
+- Consider a program that accesses files under `/COMMON-NAME/DIR`. The owner of the `COMMON-NAME` GitHub account could create a repository named `DIR` and inject arbitrary file content into the program's process. This problem is particularly important when mounting the file system as a drive on Windows. To fix this problem:
 
-    - For example, consider an application that always accesses files under `/billziss-gh/content`. Because I own the `billziss-gh` account I could create a repository named `content` and inject file content into someone's process. While the `/billziss-gh` prefix is unlikely, other prefixes are far more likely.
+    - Run HUBFS with the `-filter` option. For example, running HUBFS with `-filter ORG` will make available the repositories in `ORG` only. Files within the file system will be accessible as / `ORG` / *repository* / *ref* / *path*. (The `-filter` option allows the inclusion/exclusion of multiple repositories and supports wildcard syntax. Please see the HUBFS usage for more.)
 
-    - To alleviate this problem one may start HUBFS with a "prefix" to restrict HUBFS usage only within a particular account or repository. For example, `./hubfs github.com/billziss-gh H:` will access only my own repositories.
-
-    - An alternative solution might involve adding an option to only allow access to a list of desired owners and their repositories.
+	- Run HUBFS with a "prefix". For example, the (Windows) command line `./hubfs github.com/ORG H:` will place the root of the file system within `ORG` and thus make available the repositories in `ORG` only. Files within the file system will be accessible as / *repository* / *ref* / *path*.
 
 ## Potential future improvements
 
