@@ -103,7 +103,7 @@ When you use the MSI installer under Windows there is better integration of HUBF
 
 In order to build HUBFS run `make` from the project's root directory. On Windows you will have to run `.\make`. The build prerequisites for individual platforms are listed below:
 
-- Windows: [Go 1.16](https://golang.org/dl/), [WinFsp](https://github.com/billziss-gh/winfsp), gcc (e.g. from [Mingw-builds](http://mingw-w64.org/doku.php/download))
+- Windows: [Go 1.16](https://golang.org/dl/), [WinFsp](https://github.com/winfsp/winfsp), gcc (e.g. from [Mingw-builds](http://mingw-w64.org/doku.php/download))
 
 - macOS: [Go 1.16](https://golang.org/dl/), [FUSE for macOS](https://osxfuse.github.io), [command line tools](https://developer.apple.com/library/content/technotes/tn2339/_index.html)
 
@@ -111,7 +111,7 @@ In order to build HUBFS run `make` from the project's root directory. On Windows
 
 ## How it works
 
-HUBFS is a cross-platform file system written in Go. Under the hood it uses [cgofuse](https://github.com/billziss-gh/cgofuse) over either [WinFsp](https://github.com/billziss-gh/winfsp) on Windows, [macFUSE](https://osxfuse.github.io/) on macOS or [libfuse](https://github.com/libfuse/libfuse/) on Linux. It also uses [go-git](https://github.com/go-git/go-git) for some git functionality.
+HUBFS is a cross-platform file system written in Go. Under the hood it uses [cgofuse](https://github.com/winfsp/cgofuse) over either [WinFsp](https://github.com/winfsp/winfsp) on Windows, [macFUSE](https://osxfuse.github.io/) on macOS or [libfuse](https://github.com/libfuse/libfuse/) on Linux. It also uses [go-git](https://github.com/go-git/go-git) for some git functionality.
 
 HUBFS interfaces with GitHub using the [REST API](https://docs.github.com/en/rest). The REST API is used to discover owners and repositories in the file system hierarchy, but is not used to access repository content. The REST API is rate limited ([details](https://docs.github.com/en/rest/overview/resources-in-the-rest-api#rate-limiting)).
 
