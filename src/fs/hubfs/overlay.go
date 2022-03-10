@@ -102,7 +102,7 @@ func newOverlay(c Config) fuse.FileSystemInterface {
 				n = r
 			}
 		}
-		n = strings.ReplaceAll(n, "/", " ")
+		n = strings.ReplaceAll(n, "/", refSlashSeparator)
 
 		root := filepath.Join(obs.repository.GetDirectory(), "files")
 		err := os.MkdirAll(root, 0700)

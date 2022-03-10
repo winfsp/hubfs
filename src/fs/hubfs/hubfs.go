@@ -49,6 +49,8 @@ type Config struct {
 	Overlay bool
 }
 
+const refSlashSeparator = "+"
+
 func new(c Config) fuse.FileSystemInterface {
 	return &hubfs{
 		client:  c.Client,
@@ -87,7 +89,7 @@ func (fs *hubfs) openex(path string, norm bool) (errc int, res *obstack, lst []s
 				lst[i] = obs.repository.Name()
 			}
 		case 2:
-			c = strings.ReplaceAll(c, " ", "/")
+			c = strings.ReplaceAll(c, refSlashSeparator, "/")
 			obs.ref, err = obs.repository.GetRef("refs/heads/" + c)
 			if providers.ErrNotFound == err {
 				obs.ref, err = obs.repository.GetRef("refs/tags/" + c)
@@ -104,7 +106,7 @@ func (fs *hubfs) openex(path string, norm bool) (errc int, res *obstack, lst []s
 						n = r
 					}
 				}
-				n = strings.ReplaceAll(n, "/", " ")
+				n = strings.ReplaceAll(n, "/", refSlashSeparator)
 				lst[i] = n
 			}
 		default:
@@ -274,7 +276,7 @@ func (fs *hubfs) Readdir(path string,
 				if r == n {
 					continue
 				}
-				n = strings.ReplaceAll(n, "/", " ")
+				n = strings.ReplaceAll(n, "/", refSlashSeparator)
 				if !fill(n, &stat, 0) {
 					break
 				}
