@@ -34,7 +34,7 @@ import (
 var (
 	MyVersion        = "DEVVER"
 	MyProductVersion = "PRDVER"
-	MyProductName    = "hubfs"
+	MyProductName    = "HUBFS"
 	MyDescription    = "File system for GitHub"
 	MyCopyright      = "2021-2022 Bill Zissimopoulos"
 )
