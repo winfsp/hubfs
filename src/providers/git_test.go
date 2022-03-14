@@ -281,6 +281,9 @@ func TestGetBlobReader(t *testing.T) {
 		t.Error(err)
 	}
 	content, err := ioutil.ReadAll(reader.(io.Reader))
+	if err != nil {
+		t.Error(err)
+	}
 	reader.(io.Closer).Close()
 	if !bytes.Contains(content, []byte("module github.com")) {
 		t.Error()
@@ -291,6 +294,9 @@ func TestGetBlobReader(t *testing.T) {
 		t.Error(err)
 	}
 	content, err = ioutil.ReadAll(reader.(io.Reader))
+	if err != nil {
+		t.Error(err)
+	}
 	reader.(io.Closer).Close()
 	if !bytes.Contains(content, []byte("module github.com")) {
 		t.Error()
