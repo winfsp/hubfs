@@ -84,7 +84,7 @@
                 <Shortcut
                     Id="S.GitHub.lnk"
                     Directory="ProductMenu"
-                    Name="Perform GitHub Auth"
+                    Name="HUBFS - Perform GitHub Auth"
                     Arguments="-auth=force -authkey=https://github.com -authonly"
                     WorkingDirectory="INSTALLDIR"
                     Advertise="yes" />
