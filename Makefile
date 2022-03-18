@@ -2,7 +2,7 @@
 
 MyBuildNumber = $(shell date +%y%j)
 MyVersion = 1.0.$(MyBuildNumber)
-MyProductVersion = "2022 Beta1"
+MyProductVersion = "2022 Beta2"
 MyProductStage = "Beta"
 
 MyProductName = "HUBFS"
