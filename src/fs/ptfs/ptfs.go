@@ -206,13 +206,16 @@ func (self *filesystem) Setcrtime(path string, tmsp fuse.Timespec) (errc int) {
 }
 
 func New(root string) fuse.FileSystemInterface {
-	errc, normpath := port.Getpath(root)
-	if 0 != errc {
-		panic("error: Getpath(\"" + root + "\") = " + fuse.Error(errc).Error())
-	}
-	trimlen := len(normpath)
-	if 1 == trimlen {
-		trimlen = 0
+	trimlen := 0
+	if "windows" == runtime.GOOS {
+		errc, normpath := port.Getpath(root)
+		if 0 != errc {
+			panic("error: Getpath(\"" + root + "\") = " + fuse.Error(errc).Error())
+		}
+		trimlen := len(normpath)
+		if 1 == trimlen {
+			trimlen = 0
+		}
 	}
 	return &filesystem{
 		root:    root,
