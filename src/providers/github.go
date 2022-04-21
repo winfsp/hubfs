@@ -26,8 +26,8 @@ import (
 	"time"
 
 	"github.com/billziss-gh/golib/appdata"
-	"github.com/billziss-gh/hubfs/httputil"
 	"github.com/cli/oauth"
+	"github.com/winfsp/hubfs/httputil"
 )
 
 type GithubProvider struct {

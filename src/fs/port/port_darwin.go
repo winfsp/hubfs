@@ -1,3 +1,4 @@
+//go:build darwin
 // +build darwin
 
 /*
@@ -18,7 +19,7 @@ package port
 import (
 	"syscall"
 
-	"github.com/billziss-gh/cgofuse/fuse"
+	"github.com/winfsp/cgofuse/fuse"
 )
 
 func Setuidgid() func() {

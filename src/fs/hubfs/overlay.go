@@ -20,10 +20,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/billziss-gh/cgofuse/fuse"
-	"github.com/billziss-gh/hubfs/fs/overlayfs"
-	"github.com/billziss-gh/hubfs/fs/ptfs"
-	"github.com/billziss-gh/hubfs/fs/unionfs"
+	"github.com/winfsp/cgofuse/fuse"
+	"github.com/winfsp/hubfs/fs/overlayfs"
+	"github.com/winfsp/hubfs/fs/ptfs"
+	"github.com/winfsp/hubfs/fs/unionfs"
 )
 
 func New(c Config) fuse.FileSystemInterface {

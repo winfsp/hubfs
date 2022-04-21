@@ -19,7 +19,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/billziss-gh/hubfs/git"
+	"github.com/winfsp/hubfs/git"
 )
 
 func warn(format string, a ...interface{}) {

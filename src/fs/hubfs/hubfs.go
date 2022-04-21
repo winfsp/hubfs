@@ -20,9 +20,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/billziss-gh/cgofuse/fuse"
 	libtrace "github.com/billziss-gh/golib/trace"
-	"github.com/billziss-gh/hubfs/providers"
+	"github.com/winfsp/cgofuse/fuse"
+	"github.com/winfsp/hubfs/providers"
 )
 
 type hubfs struct {

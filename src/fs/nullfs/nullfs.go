@@ -14,7 +14,7 @@
 package nullfs
 
 import (
-	"github.com/billziss-gh/cgofuse/fuse"
+	"github.com/winfsp/cgofuse/fuse"
 )
 
 type filesystem struct {

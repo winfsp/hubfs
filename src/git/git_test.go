@@ -152,7 +152,7 @@ func TestFetchObjects(t *testing.T) {
 
 func TestMain(m *testing.M) {
 	libtrace.Verbose = true
-	libtrace.Pattern = "github.com/billziss-gh/hubfs/*"
+	libtrace.Pattern = "github.com/winfsp/hubfs/*"
 
 	var err error
 	token, err = keyring.Get("hubfs", "https://github.com")

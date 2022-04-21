@@ -34,7 +34,7 @@ func atexit(fn func()) {
 
 func TestMain(m *testing.M) {
 	libtrace.Verbose = true
-	libtrace.Pattern = "github.com/billziss-gh/hubfs/*"
+	libtrace.Pattern = "github.com/winfsp/hubfs/*"
 
 	for i := range atinitFn {
 		err := atinitFn[i]()

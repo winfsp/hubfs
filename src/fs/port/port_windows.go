@@ -1,3 +1,4 @@
+//go:build windows
 // +build windows
 
 /*
@@ -21,7 +22,7 @@ import (
 	"unicode/utf16"
 	"unsafe"
 
-	"github.com/billziss-gh/cgofuse/fuse"
+	"github.com/winfsp/cgofuse/fuse"
 )
 
 func init() {

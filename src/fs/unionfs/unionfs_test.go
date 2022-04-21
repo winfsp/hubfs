@@ -22,8 +22,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/billziss-gh/cgofuse/fuse"
 	"github.com/billziss-gh/golib/trace"
+	"github.com/winfsp/cgofuse/fuse"
 )
 
 type testrun struct {
@@ -601,7 +601,7 @@ func TestUnionfs(t *testing.T) {
 	// 	}
 	// }
 	// trace.Logger = log.New(w, "", log.LstdFlags)
-	// trace.Pattern = "github.com/billziss-gh/hubfs/fs.*"
+	// trace.Pattern = "github.com/winfsp/hubfs/fs.*"
 	// trace.Verbose = true
 
 	seed := time.Now().UnixNano()

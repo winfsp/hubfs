@@ -23,8 +23,8 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/billziss-gh/cgofuse/fuse"
-	"github.com/billziss-gh/hubfs/fs/unionfs"
+	"github.com/winfsp/cgofuse/fuse"
+	"github.com/winfsp/hubfs/fs/unionfs"
 )
 
 type onefs struct {

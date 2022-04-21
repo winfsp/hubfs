@@ -17,7 +17,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/billziss-gh/cgofuse/fuse"
+	"github.com/winfsp/cgofuse/fuse"
 )
 
 func split(path string) []string {

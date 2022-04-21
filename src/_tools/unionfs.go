@@ -19,10 +19,10 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/billziss-gh/cgofuse/fuse"
-	"github.com/billziss-gh/hubfs/fs/port"
-	"github.com/billziss-gh/hubfs/fs/ptfs"
-	"github.com/billziss-gh/hubfs/fs/unionfs"
+	"github.com/winfsp/cgofuse/fuse"
+	"github.com/winfsp/hubfs/fs/port"
+	"github.com/winfsp/hubfs/fs/ptfs"
+	"github.com/winfsp/hubfs/fs/unionfs"
 )
 
 func main() {

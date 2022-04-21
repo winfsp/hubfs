@@ -14,8 +14,8 @@
 package unionfs
 
 import (
-	"github.com/billziss-gh/cgofuse/fuse"
-	"github.com/billziss-gh/hubfs/fs/memfs"
+	"github.com/winfsp/cgofuse/fuse"
+	"github.com/winfsp/hubfs/fs/memfs"
 )
 
 func newTestfs() fuse.FileSystemInterface {

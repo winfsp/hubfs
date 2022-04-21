@@ -1,3 +1,4 @@
+//go:build windows || darwin || linux
 // +build windows darwin linux
 
 /*
@@ -20,8 +21,8 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/billziss-gh/cgofuse/fuse"
-	"github.com/billziss-gh/hubfs/fs/port"
+	"github.com/winfsp/cgofuse/fuse"
+	"github.com/winfsp/hubfs/fs/port"
 )
 
 type filesystem struct {

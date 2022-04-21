@@ -18,8 +18,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/billziss-gh/cgofuse/fuse"
-	"github.com/billziss-gh/hubfs/fs/nullfs"
+	"github.com/winfsp/cgofuse/fuse"
+	"github.com/winfsp/hubfs/fs/nullfs"
 )
 
 type filesystem struct {

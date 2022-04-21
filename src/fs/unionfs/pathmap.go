@@ -78,7 +78,7 @@ import (
 	"sort"
 	"sync"
 
-	"github.com/billziss-gh/cgofuse/fuse"
+	"github.com/winfsp/cgofuse/fuse"
 )
 
 type Pathmap struct {

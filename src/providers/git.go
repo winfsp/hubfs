@@ -27,7 +27,7 @@ import (
 	"time"
 
 	"github.com/billziss-gh/golib/config"
-	"github.com/billziss-gh/hubfs/git"
+	"github.com/winfsp/hubfs/git"
 )
 
 type gitRepository struct {

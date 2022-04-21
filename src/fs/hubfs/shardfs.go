@@ -20,7 +20,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/billziss-gh/cgofuse/fuse"
+	"github.com/winfsp/cgofuse/fuse"
 )
 
 type shardfs struct {

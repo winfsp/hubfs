@@ -1,3 +1,4 @@
+//go:build darwin || linux
 // +build darwin linux
 
 /*
@@ -18,7 +19,7 @@ package port
 import (
 	"syscall"
 
-	"github.com/billziss-gh/cgofuse/fuse"
+	"github.com/winfsp/cgofuse/fuse"
 )
 
 func Chdir(path string) (errc int) {

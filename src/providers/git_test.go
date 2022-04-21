@@ -24,7 +24,7 @@ import (
 	"github.com/billziss-gh/golib/keyring"
 )
 
-const remote = "https://github.com/billziss-gh/hubfs"
+const remote = "https://github.com/winfsp/hubfs"
 const refName = "refs/heads/master"
 const entryName = "README.md"
 const subtreeName = "src"
@@ -298,7 +298,7 @@ func TestGetBlobReader(t *testing.T) {
 }
 
 func TestGetModule(t *testing.T) {
-	const remote = "https://github.com/billziss-gh/winfsp"
+	const remote = "https://github.com/winfsp/winfsp"
 	const refName = "refs/heads/master"
 	const modulePath = "ext/test"
 	const moduleTarget = "/billziss-gh/secfs.test"

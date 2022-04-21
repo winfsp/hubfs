@@ -23,12 +23,12 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/billziss-gh/cgofuse/fuse"
 	"github.com/billziss-gh/golib/keyring"
 	libtrace "github.com/billziss-gh/golib/trace"
-	"github.com/billziss-gh/hubfs/fs/hubfs"
-	"github.com/billziss-gh/hubfs/fs/port"
-	"github.com/billziss-gh/hubfs/providers"
+	"github.com/winfsp/cgofuse/fuse"
+	"github.com/winfsp/hubfs/fs/hubfs"
+	"github.com/winfsp/hubfs/fs/port"
+	"github.com/winfsp/hubfs/providers"
 )
 
 var (
@@ -202,7 +202,7 @@ func run() int {
 
 	if debug {
 		libtrace.Verbose = true
-		libtrace.Pattern = "*,github.com/billziss-gh/hubfs/*,github.com/billziss-gh/hubfs/fs/*"
+		libtrace.Pattern = "*,github.com/winfsp/hubfs/*,github.com/winfsp/hubfs/fs/*"
 	}
 
 	uri, err := url.Parse(remote)

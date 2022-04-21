@@ -19,7 +19,6 @@ import (
 	"time"
 
 	libtrace "github.com/billziss-gh/golib/trace"
-	"github.com/billziss-gh/hubfs/httputil"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/format/packfile"
 	"github.com/go-git/go-git/v5/plumbing/object"
@@ -28,6 +27,7 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/storer"
 	"github.com/go-git/go-git/v5/plumbing/transport"
 	"github.com/go-git/go-git/v5/plumbing/transport/http"
+	"github.com/winfsp/hubfs/httputil"
 )
 
 type ObjectType int
