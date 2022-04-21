@@ -27,7 +27,8 @@ import (
 
 type filesystem struct {
 	fuse.FileSystemBase
-	root string
+	root    string
+	trimlen int
 }
 
 func (self *filesystem) Statfs(path string, stat *fuse.Statfs_t) (errc int) {
@@ -133,6 +134,23 @@ func (self *filesystem) Getattr(path string, stat *fuse.Stat_t, fh uint64) (errc
 	}
 }
 
+func (self *filesystem) Getpath(path string, fh uint64) (errc int, normpath string) {
+	if ^uint64(0) == fh {
+		path = filepath.Join(self.root, path)
+		errc, normpath = port.Getpath(path)
+	} else {
+		errc, normpath = port.Fgetpath(fh)
+	}
+	if 0 == errc {
+		if len(normpath) > self.trimlen {
+			normpath = normpath[self.trimlen:]
+		} else {
+			normpath = "/"
+		}
+	}
+	return
+}
+
 func (self *filesystem) Truncate(path string, size int64, fh uint64) (errc int) {
 	if ^uint64(0) == fh {
 		path = filepath.Join(self.root, path)
@@ -188,5 +206,16 @@ func (self *filesystem) Setcrtime(path string, tmsp fuse.Timespec) (errc int) {
 }
 
 func New(root string) fuse.FileSystemInterface {
-	return &filesystem{root: root}
+	errc, normpath := port.Getpath(root)
+	if 0 != errc {
+		panic("error: Getpath(\"" + root + "\") = " + fuse.Error(errc).Error())
+	}
+	trimlen := len(normpath)
+	if 1 == trimlen {
+		trimlen = 0
+	}
+	return &filesystem{
+		root:    root,
+		trimlen: trimlen,
+	}
 }

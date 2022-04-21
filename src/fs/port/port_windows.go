@@ -498,6 +498,41 @@ func Fstat(fh uint64, stat *fuse.Stat_t) (errc int) {
 	return 0
 }
 
+func Getpath(path string) (errc int, normpath string) {
+	errc, fh := open(path, 0, syscall.OPEN_EXISTING, 0)
+	if 0 == errc {
+		errc, normpath = Fgetpath(fh)
+		close(fh)
+	}
+
+	return
+}
+
+func Fgetpath(fh uint64) (errc int, normpath string) {
+	buf := [1024]uint16{}
+
+	r1, _, e := syscall.Syscall6(
+		getFinalPathNameByHandleW.Addr(),
+		4,
+		uintptr(fh),
+		uintptr(unsafe.Pointer(&buf[0])),
+		uintptr(len(buf)),
+		4, /*VOLUME_NAME_NONE | FILE_NAME_NORMALIZED*/
+		0,
+		0)
+	if 0 == r1 {
+		return Errno(e), ""
+	}
+	if uintptr(len(buf)) < r1 {
+		return -fuse.ENAMETOOLONG, ""
+	}
+
+	path := string(utf16.Decode(buf[:r1]))
+	normpath = strings.ReplaceAll(path, `\`, `/`)
+
+	return
+}
+
 func Truncate(path string, length int64) (errc int) {
 	errc, fh := open(path, 2 /*FILE_WRITE_DATA*/, syscall.OPEN_EXISTING, 0)
 	if 0 == errc {
@@ -953,6 +988,7 @@ var (
 	advapi32                     = syscall.MustLoadDLL("advapi32.dll")
 	getDiskFreeSpaceW            = kernel32.MustFindProc("GetDiskFreeSpaceW")
 	getFileInformationByHandleEx = kernel32.MustFindProc("GetFileInformationByHandleEx")
+	getFinalPathNameByHandleW    = kernel32.MustFindProc("GetFinalPathNameByHandleW")
 	getVolumeInformationW        = kernel32.MustFindProc("GetVolumeInformationW")
 	getVolumePathNameW           = kernel32.MustFindProc("GetVolumePathNameW")
 	setFileInformationByHandle   = kernel32.MustFindProc("SetFileInformationByHandle")

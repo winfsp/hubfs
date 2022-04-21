@@ -120,6 +120,14 @@ func Fstat(fh uint64, stat *fuse.Stat_t) (errc int) {
 	return 0
 }
 
+func Getpath(path string) (errc int, normpath string) {
+	return -fuse.ENOSYS, ""
+}
+
+func Fgetpath(fh uint64) (errc int, normpath string) {
+	return -fuse.ENOSYS, ""
+}
+
 func Truncate(path string, length int64) (errc int) {
 	return Errno(syscall.Truncate(path, length))
 }
