@@ -275,17 +275,17 @@ func (fs *filesystem) notempty(path string, isopq bool, v uint8) (res bool) {
 	return
 }
 
-func (fs *filesystem) readpath(path string, v uint8) string {
+func (fs *filesystem) getpath(path string, v uint8) string {
 	if !fs.filemap.Caseins {
 		return path
 	}
 
-	rp, ok := fs.fslist[v].(FileSystemReadpath)
+	gp, ok := fs.fslist[v].(fuse.FileSystemGetpath)
 	if !ok {
 		return path
 	}
 
-	errc, p := rp.Readpath(path)
+	errc, p := gp.Getpath(path, ^uint64(0))
 	if 0 != errc || strings.ToUpper(p) != strings.ToUpper(path) {
 		return path
 	}
@@ -340,7 +340,7 @@ func (fs *filesystem) mkpdir(path string) (errc int) {
 }
 
 func (fs *filesystem) _cpdir(path string, v uint8, stat *fuse.Stat_t) (errc int) {
-	path = fs.readpath(path, v)
+	path = fs.getpath(path, v)
 
 	dstfs := fs.fslist[0]
 
@@ -389,7 +389,7 @@ func (fs *filesystem) cpdir(path string, v uint8, stat *fuse.Stat_t) (errc int) 
 }
 
 func (fs *filesystem) cplink(path string, v uint8, stat *fuse.Stat_t) (errc int) {
-	path = fs.readpath(path, v)
+	path = fs.getpath(path, v)
 
 	srcfs := fs.fslist[v]
 	dstfs := fs.fslist[0]
@@ -434,7 +434,7 @@ func (fs *filesystem) cplink(path string, v uint8, stat *fuse.Stat_t) (errc int)
 }
 
 func (fs *filesystem) cpfile(path string, v uint8, stat *fuse.Stat_t, srcfh uint64) (errc int) {
-	path = fs.readpath(path, v)
+	path = fs.getpath(path, v)
 
 	srcfs := fs.fslist[v]
 	dstfs := fs.fslist[0]
@@ -1197,6 +1197,37 @@ func (fs *filesystem) Listxattr(path string, fill func(name string) bool) (errc 
 	})
 }
 
+func (fs *filesystem) Getpath(path string, fh uint64) (errc int, normpath string) {
+	if !fs.filemap.Caseins {
+		return 0, path
+	}
+
+	if ^uint64(0) == fh {
+		errc = fs.getnode(path, func(isopq bool, v uint8) int {
+			intf, ok := fs.fslist[v].(fuse.FileSystemGetpath)
+			if !ok {
+				normpath = path
+				return 0
+			}
+			errc, normpath = intf.Getpath(path, fh)
+			return errc
+		})
+	} else {
+		_, v, fh := fs.getfile(path, fh)
+		if UNKNOWN == v {
+			return -fuse.EIO, ""
+		}
+
+		intf, ok := fs.fslist[v].(fuse.FileSystemGetpath)
+		if !ok {
+			return 0, path
+		}
+		errc, normpath = intf.Getpath(path, fh)
+	}
+
+	return
+}
+
 func (fs *filesystem) Chflags(path string, flags uint32) (errc int) {
 	intf, ok := fs.fslist[0].(fuse.FileSystemChflags)
 	if !ok {
@@ -1240,6 +1271,7 @@ func hasPathPrefix(path, prefix string, caseins bool) bool {
 }
 
 var _ fuse.FileSystemInterface = (*filesystem)(nil)
+var _ fuse.FileSystemGetpath = (*filesystem)(nil)
 var _ fuse.FileSystemChflags = (*filesystem)(nil)
 var _ fuse.FileSystemSetcrtime = (*filesystem)(nil)
 var _ fuse.FileSystemSetchgtime = (*filesystem)(nil)

@@ -58,7 +58,6 @@ func main() {
 			panic(err)
 		}
 		fslist = append(fslist, ptfs.New(r))
-
 	}
 
 	caseins := false
