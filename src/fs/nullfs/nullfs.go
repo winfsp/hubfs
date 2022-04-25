@@ -153,6 +153,10 @@ func (fs *filesystem) Listxattr(path string, fill func(name string) bool) (errc 
 	return -fuse.ENOENT
 }
 
+func (fs *filesystem) Getpath(path string, fh uint64) (errc int, normpath string) {
+	return -fuse.ENOENT, ""
+}
+
 func (fs *filesystem) Chflags(path string, flags uint32) (errc int) {
 	return -fuse.ENOENT
 }
@@ -166,6 +170,7 @@ func (fs *filesystem) Setchgtime(path string, tmsp fuse.Timespec) (errc int) {
 }
 
 var _ fuse.FileSystemInterface = (*filesystem)(nil)
+var _ fuse.FileSystemGetpath = (*filesystem)(nil)
 var _ fuse.FileSystemChflags = (*filesystem)(nil)
 var _ fuse.FileSystemSetcrtime = (*filesystem)(nil)
 var _ fuse.FileSystemSetchgtime = (*filesystem)(nil)

@@ -169,17 +169,16 @@ func (fs *hubfs) getattr(obs *obstack, entry providers.TreeEntry, path string, s
 	return
 }
 
-func (fs *hubfs) Readpath(path string) (errc int, target string) {
-	defer trace(path)(&errc, &target)
+func (fs *hubfs) Getpath(path string, fh uint64) (errc int, normpath string) {
+	defer trace(path, fh)(&errc, &normpath)
 
-	errc, obs, normpath := fs.openex(path, true)
-	if 0 == errc {
+	errc0, obs, pathlst := fs.openex(path, true)
+	if 0 == errc0 {
 		fs.release(obs)
 	}
 
-	errc = 0
-	target = "/" + pathutil.Join(normpath...)
-	target = strings.TrimPrefix(target, strings.TrimSuffix(fs.prefix, "/"))
+	normpath = "/" + pathutil.Join(pathlst...)
+	normpath = strings.TrimPrefix(normpath, strings.TrimSuffix(fs.prefix, "/"))
 
 	return
 }

@@ -196,6 +196,14 @@ func (fs *shardfs) Removexattr(path string, name string) (errc int) {
 	return
 }
 
+func (fs *shardfs) Getpath(path string, fh uint64) (errc int, normpath string) {
+	intf, ok := fs.FileSystemInterface.(fuse.FileSystemGetpath)
+	if !ok {
+		return -fuse.ENOSYS, ""
+	}
+	return intf.Getpath(path, fh)
+}
+
 func (fs *shardfs) Chflags(path string, flags uint32) (errc int) {
 	/* lie! */
 	return 0
@@ -212,6 +220,7 @@ func (fs *shardfs) Setchgtime(path string, tmsp fuse.Timespec) (errc int) {
 }
 
 var _ fuse.FileSystemInterface = (*shardfs)(nil)
+var _ fuse.FileSystemGetpath = (*shardfs)(nil)
 var _ fuse.FileSystemChflags = (*shardfs)(nil)
 var _ fuse.FileSystemSetcrtime = (*shardfs)(nil)
 var _ fuse.FileSystemSetchgtime = (*shardfs)(nil)

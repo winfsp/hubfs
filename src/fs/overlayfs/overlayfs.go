@@ -14,6 +14,7 @@
 package overlayfs
 
 import (
+	pathutil "path"
 	"strings"
 	"sync"
 	"time"
@@ -35,9 +36,10 @@ type filesystem struct {
 
 type shardfs struct {
 	fuse.FileSystemInterface
-	prefix string
-	rc     int
-	timer  *time.Timer
+	prefix     string
+	normprefix string
+	rc         int
+	timer      *time.Timer
 }
 
 type Config struct {
@@ -76,10 +78,15 @@ func (fs *filesystem) acquirefs(path string, delta int) (dstfs *shardfs, remain 
 	dstfs = fs.fsmap[prefix]
 	if nil == dstfs {
 		if newfs := fs.newfs(csprefix); nil != newfs {
-			dstfs = &shardfs{FileSystemInterface: newfs, prefix: prefix}
+			dstfs = &shardfs{FileSystemInterface: newfs, prefix: prefix, normprefix: prefix}
 			fs.fsmap[prefix] = dstfs
 			dstfs.Init()
 			dstfs.rc += delta
+			if intf, ok := fs.topfs.FileSystemInterface.(fuse.FileSystemGetpath); ok {
+				if errc, normpath := intf.Getpath(path, ^uint64(0)); 0 == errc {
+					dstfs.normprefix = normpath
+				}
+			}
 		} else {
 			dstfs = fs.nullfs
 		}
@@ -336,6 +343,20 @@ func (fs *filesystem) Listxattr(path string, fill func(name string) bool) (errc 
 	return dstfs.Listxattr(path, fill)
 }
 
+func (fs *filesystem) Getpath(path string, fh uint64) (errc int, normpath string) {
+	dstfs, path := fs.acquirefs(path, +1)
+	defer fs.releasefs(dstfs, -1, nil)
+	intf, ok := dstfs.FileSystemInterface.(fuse.FileSystemGetpath)
+	if !ok {
+		return -fuse.ENOSYS, ""
+	}
+	errc, normpath = intf.Getpath(path, fh)
+	if 0 == errc {
+		normpath = pathutil.Join(dstfs.normprefix, normpath)
+	}
+	return
+}
+
 func (fs *filesystem) Chflags(path string, flags uint32) (errc int) {
 	dstfs, path := fs.acquirefs(path, +1)
 	defer fs.releasefs(dstfs, -1, nil)
@@ -367,6 +388,7 @@ func (fs *filesystem) Setchgtime(path string, tmsp fuse.Timespec) (errc int) {
 }
 
 var _ fuse.FileSystemInterface = (*filesystem)(nil)
+var _ fuse.FileSystemGetpath = (*filesystem)(nil)
 var _ fuse.FileSystemChflags = (*filesystem)(nil)
 var _ fuse.FileSystemSetcrtime = (*filesystem)(nil)
 var _ fuse.FileSystemSetchgtime = (*filesystem)(nil)
