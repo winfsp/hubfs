@@ -153,7 +153,7 @@ func (fs *hubfs) getattr(obs *obstack, entry providers.TreeEntry, path string, s
 			target = entry.Target()
 			path = repoPath(pathutil.Join(fs.prefix, path))
 			module, err := obs.repository.GetModule(obs.ref, path, true)
-			module = strings.TrimPrefix(module, strings.TrimSuffix(fs.prefix, "/"))
+			module = strings.TrimPrefix(module, fs.prefix)
 			if "" != module {
 				target = module + "/" + entry.Target()
 			} else {
@@ -178,7 +178,10 @@ func (fs *hubfs) Getpath(path string, fh uint64) (errc int, normpath string) {
 	}
 
 	normpath = "/" + pathutil.Join(pathlst...)
-	normpath = strings.TrimPrefix(normpath, strings.TrimSuffix(fs.prefix, "/"))
+	normpath = strings.TrimPrefix(normpath, fs.prefix)
+	if "" == normpath {
+		normpath = "/"
+	}
 
 	return
 }
