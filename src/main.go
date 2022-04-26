@@ -84,7 +84,7 @@ func authNewClientWithKey(provider providers.Provider, authkey string) (
 	return
 }
 
-func mount(client providers.Client, prefix string, mntpnt string, config []string) bool {
+func mount(client providers.Client, overlay bool, prefix string, mntpnt string, config []string) bool {
 	mntopt := []string{}
 	for _, s := range config {
 		mntopt = append(mntopt, "-o"+s)
@@ -107,7 +107,7 @@ func mount(client providers.Client, prefix string, mntpnt string, config []strin
 		Client:  client,
 		Prefix:  prefix,
 		Caseins: caseins,
-		Overlay: true,
+		Overlay: overlay,
 	})
 	host := fuse.NewFileSystemHost(fs)
 	host.SetCapCaseInsensitive(caseins)
@@ -131,6 +131,7 @@ func run() int {
 	authmeth := "full"
 	authkey := ""
 	authonly := false
+	readonly := false
 	filter := optlist{}
 	mntopt := optlist{}
 	remote := "github.com"
@@ -154,6 +155,7 @@ func run() int {
 			"- token=T   use specified auth token T; do not use system keyring")
 	flag.StringVar(&authkey, "authkey", authkey, "`name` of key that stores auth token in system keyring")
 	flag.BoolVar(&authonly, "authonly", authonly, "perform auth only; do not mount")
+	flag.BoolVar(&readonly, "readonly", readonly, "read only file system")
 	flag.Var(&filter, "filter",
 		"list of `rules` that determine repo availability\n"+
 			"- list form: rule1,rule2,...\n"+
@@ -293,7 +295,7 @@ func run() int {
 
 		port.Umask(0)
 
-		if !mount(client, uri.Path, mntpnt, config) {
+		if !mount(client, !readonly, uri.Path, mntpnt, config) {
 			return 1
 		}
 	}
