@@ -83,8 +83,8 @@ func (fs *filesystem) acquirefs(path string, delta int) (dstfs *shardfs, remain 
 			dstfs.Init()
 			dstfs.rc += delta
 			if intf, ok := fs.topfs.FileSystemInterface.(fuse.FileSystemGetpath); ok {
-				if errc, normpath := intf.Getpath(path, ^uint64(0)); 0 == errc {
-					dstfs.normprefix = normpath
+				if errc, normprefix := intf.Getpath(prefix, ^uint64(0)); 0 == errc {
+					dstfs.normprefix = normprefix
 				}
 			}
 		} else {
