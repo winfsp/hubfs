@@ -24,6 +24,7 @@ import (
 
 	libtrace "github.com/billziss-gh/golib/trace"
 	"github.com/winfsp/cgofuse/fuse"
+	"github.com/winfsp/hubfs/fs/port"
 	"github.com/winfsp/hubfs/providers"
 )
 
@@ -417,6 +418,10 @@ func (fs *hubfs) Release(path string, fh uint64) (errc int) {
 	fs.release(obs)
 
 	return
+}
+
+func (self *hubfs) Statfs(path string, stat *fuse.Statfs_t) (errc int) {
+	return port.Statfs(self.client.GetDirectory(), stat)
 }
 
 func fuseErrc(err error) (errc int) {

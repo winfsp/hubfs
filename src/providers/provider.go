@@ -30,6 +30,7 @@ type Provider interface {
 
 type Client interface {
 	SetConfig(config []string) ([]string, error)
+	GetDirectory() string
 	GetOwners() ([]Owner, error)
 	OpenOwner(name string) (Owner, error)
 	CloseOwner(owner Owner)

@@ -187,6 +187,13 @@ func (client *githubClient) SetConfig(config []string) ([]string, error) {
 	return res, nil
 }
 
+func (client *githubClient) GetDirectory() string {
+	client.lock.Lock()
+	dir := client.dir
+	client.lock.Unlock()
+	return dir
+}
+
 func (client *githubClient) sendrecv(path string) (*http.Response, error) {
 	req, err := http.NewRequest("GET", client.apiURI+path, nil)
 	if nil != err {
