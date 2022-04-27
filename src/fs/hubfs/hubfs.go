@@ -16,6 +16,8 @@ package hubfs
 import (
 	"io"
 	pathutil "path"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -150,15 +152,22 @@ func (fs *hubfs) getattr(obs *obstack, entry providers.TreeEntry, path string, s
 			target = entry.Target()
 			stat.Size = int64(len(target))
 		case 0160000 /* submodule */ :
+			path = pathutil.Join(fs.prefix, path)
 			target = entry.Target()
-			path = repoPath(pathutil.Join(fs.prefix, path))
-			module, err := obs.repository.GetModule(obs.ref, path, true)
-			module = strings.TrimPrefix(module, fs.prefix)
+			remain := repoPath(path)
+			module, err := obs.repository.GetModule(obs.ref, remain, true)
 			if "" != module {
-				target = module + "/" + entry.Target()
+				if t, e := filepath.Rel(pathutil.Dir(path), module+"/"+entry.Target()); nil == e {
+					if "windows" == runtime.GOOS {
+						t = strings.ReplaceAll(t, `\`, `/`)
+					}
+					target = t
+				} else {
+					target = strings.TrimPrefix(module, fs.prefix) + "/" + entry.Target()
+				}
 			} else {
 				tracef("repo=%#v Getmodule(ref=%#v, %#v) = %v",
-					obs.repository.Name(), obs.ref.Name(), path, err)
+					obs.repository.Name(), obs.ref.Name(), remain, err)
 			}
 			stat.Size = int64(len(target))
 		}
