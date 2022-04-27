@@ -14,10 +14,6 @@
 package hubfs
 
 import (
-	pathutil "path"
-	"path/filepath"
-	"runtime"
-	"strings"
 	"sync"
 
 	"github.com/winfsp/cgofuse/fuse"
@@ -25,6 +21,7 @@ import (
 
 type shardfs struct {
 	fuse.FileSystemInterface
+	fuse.FileSystemGetpath
 	topfs    *hubfs
 	prefix   string
 	obs      *obstack
@@ -35,6 +32,7 @@ type shardfs struct {
 func newShardfs(topfs *hubfs, prefix string, obs *obstack, fs fuse.FileSystemInterface) fuse.FileSystemInterface {
 	return &shardfs{
 		FileSystemInterface: fs,
+		FileSystemGetpath:   fs.(fuse.FileSystemGetpath),
 		topfs:               topfs,
 		prefix:              prefix,
 		obs:                 obs,
@@ -110,20 +108,6 @@ func (fs *shardfs) Symlink(target string, newpath string) (errc int) {
 	return
 }
 
-func (fs *shardfs) Readlink(path string) (errc int, target string) {
-	errc, target = fs.FileSystemInterface.Readlink(path)
-	if 0 == errc && 0 < len(target) && "/" == target[:1] {
-		target = strings.TrimPrefix(target, strings.TrimSuffix(fs.topfs.prefix, "/"))
-		if t, e := filepath.Rel(pathutil.Dir(pathutil.Join(fs.prefix, path)), target); nil == e {
-			if "windows" == runtime.GOOS {
-				t = strings.ReplaceAll(t, `\`, `/`)
-			}
-			target = t
-		}
-	}
-	return
-}
-
 func (fs *shardfs) Rename(oldpath string, newpath string) (errc int) {
 	errc = fs.FileSystemInterface.Rename(oldpath, newpath)
 	if 0 == errc {
@@ -194,14 +178,6 @@ func (fs *shardfs) Removexattr(path string, name string) (errc int) {
 		fs.initonce()
 	}
 	return
-}
-
-func (fs *shardfs) Getpath(path string, fh uint64) (errc int, normpath string) {
-	intf, ok := fs.FileSystemInterface.(fuse.FileSystemGetpath)
-	if !ok {
-		return -fuse.ENOSYS, ""
-	}
-	return intf.Getpath(path, fh)
 }
 
 func (fs *shardfs) Chflags(path string, flags uint32) (errc int) {
