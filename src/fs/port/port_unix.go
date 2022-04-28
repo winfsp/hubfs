@@ -17,10 +17,15 @@
 package port
 
 import (
+	"path/filepath"
 	"syscall"
 
 	"github.com/winfsp/cgofuse/fuse"
 )
+
+func Realpath(path string) (errc int, normpath string) {
+	return Getpath(path)
+}
 
 func Chdir(path string) (errc int) {
 	return Errno(syscall.Chdir(path))
@@ -121,7 +126,15 @@ func Fstat(fh uint64, stat *fuse.Stat_t) (errc int) {
 }
 
 func Getpath(path string) (errc int, normpath string) {
-	return -fuse.ENOSYS, ""
+	p, e := filepath.Abs(path)
+	if nil != e {
+		return Errno(e), ""
+	}
+	p, e = filepath.EvalSymlinks(p)
+	if nil != e {
+		return Errno(e), ""
+	}
+	return 0, p
 }
 
 func Fgetpath(fh uint64) (errc int, normpath string) {

@@ -22,6 +22,7 @@ import (
 
 	"github.com/winfsp/cgofuse/fuse"
 	"github.com/winfsp/hubfs/fs/overlayfs"
+	"github.com/winfsp/hubfs/fs/port"
 	"github.com/winfsp/hubfs/fs/ptfs"
 	"github.com/winfsp/hubfs/fs/unionfs"
 )
@@ -114,6 +115,12 @@ func newOverlay(c Config) fuse.FileSystemInterface {
 		root = filepath.Join(root, n)
 		err = os.MkdirAll(root, 0755)
 		if nil != err {
+			topfs.release(obs)
+			return nil
+		}
+
+		errc, root = port.Realpath(root)
+		if 0 != errc {
 			topfs.release(obs)
 			return nil
 		}

@@ -17,6 +17,7 @@
 package port
 
 import (
+	"path/filepath"
 	"strings"
 	"syscall"
 	"unicode/utf16"
@@ -71,6 +72,20 @@ func init() {
 
 		token.Close()
 	}
+}
+
+func Realpath(path string) (errc int, normpath string) {
+	p, e := filepath.Abs(path)
+	if nil != e {
+		return Errno(e), ""
+	}
+	v := filepath.VolumeName(p)
+	errc, normpath = Getpath(p)
+	if 0 != errc {
+		return
+	}
+	normpath = v + normpath
+	return
 }
 
 func Chdir(path string) (errc int) {
