@@ -28,7 +28,7 @@ import (
 	"github.com/winfsp/cgofuse/fuse"
 	"github.com/winfsp/hubfs/fs/hubfs"
 	"github.com/winfsp/hubfs/fs/port"
-	"github.com/winfsp/hubfs/providers"
+	"github.com/winfsp/hubfs/prov"
 )
 
 var (
@@ -60,8 +60,8 @@ func (mntopt *optlist) Set(s string) error {
 	return nil
 }
 
-func newClientWithKey(provider providers.Provider, authkey string) (
-	client providers.Client, err error) {
+func newClientWithKey(provider prov.Provider, authkey string) (
+	client prov.Client, err error) {
 	token, err := keyring.Get(MyProductName, authkey)
 	if nil == err {
 		client, err = provider.NewClient(token)
@@ -72,8 +72,8 @@ func newClientWithKey(provider providers.Provider, authkey string) (
 	return
 }
 
-func authNewClientWithKey(provider providers.Provider, authkey string) (
-	client providers.Client, err error) {
+func authNewClientWithKey(provider prov.Provider, authkey string) (
+	client prov.Client, err error) {
 	token, err := provider.Auth()
 	if nil == err {
 		client, err = provider.NewClient(token)
@@ -84,7 +84,7 @@ func authNewClientWithKey(provider providers.Provider, authkey string) (
 	return
 }
 
-func mount(client providers.Client, overlay bool, prefix string, mntpnt string, config []string) bool {
+func mount(client prov.Client, overlay bool, prefix string, mntpnt string, config []string) bool {
 	mntopt := []string{}
 	for _, s := range config {
 		mntopt = append(mntopt, "-o"+s)
@@ -216,8 +216,8 @@ func run() int {
 		return 1
 	}
 
-	provname := providers.GetProviderName(uri)
-	provider := providers.GetProvider(provname)
+	provname := prov.GetProviderName(uri)
+	provider := prov.GetProvider(provname)
 	if nil == provider {
 		warn("unknown provider: %s", provname)
 		return 1
@@ -227,7 +227,7 @@ func run() int {
 		authkey = provname
 	}
 
-	var client providers.Client
+	var client prov.Client
 	switch authmeth {
 	case "force":
 		client, err = authNewClientWithKey(provider, authkey)

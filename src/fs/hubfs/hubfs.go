@@ -25,12 +25,12 @@ import (
 	libtrace "github.com/billziss-gh/golib/trace"
 	"github.com/winfsp/cgofuse/fuse"
 	"github.com/winfsp/hubfs/fs/port"
-	"github.com/winfsp/hubfs/providers"
+	"github.com/winfsp/hubfs/prov"
 )
 
 type hubfs struct {
 	fuse.FileSystemBase
-	client  providers.Client
+	client  prov.Client
 	prefix  string
 	lock    sync.RWMutex
 	fh      uint64
@@ -38,15 +38,15 @@ type hubfs struct {
 }
 
 type obstack struct {
-	owner      providers.Owner
-	repository providers.Repository
-	ref        providers.Ref
-	entry      providers.TreeEntry
+	owner      prov.Owner
+	repository prov.Repository
+	ref        prov.Ref
+	entry      prov.TreeEntry
 	reader     io.ReaderAt
 }
 
 type Config struct {
-	Client  providers.Client
+	Client  prov.Client
 	Prefix  string
 	Caseins bool
 	Overlay bool
@@ -79,7 +79,7 @@ func (fs *hubfs) openex(path string, norm bool) (errc int, res *obstack, lst []s
 			// - All names containing dots: e.g. ".git", ".DS_Store", "autorun.inf"
 			// - The special git name HEAD
 			if -1 != strings.IndexFunc(c, func(r rune) bool { return '.' == r }) || "HEAD" == c {
-				obs.owner, err = nil, providers.ErrNotFound
+				obs.owner, err = nil, prov.ErrNotFound
 			} else {
 				obs.owner, err = fs.client.OpenOwner(c)
 				if norm && nil == err {
@@ -94,9 +94,9 @@ func (fs *hubfs) openex(path string, norm bool) (errc int, res *obstack, lst []s
 		case 2:
 			c = strings.ReplaceAll(c, refSlashSeparator, "/")
 			obs.ref, err = obs.repository.GetRef("refs/heads/" + c)
-			if providers.ErrNotFound == err {
+			if prov.ErrNotFound == err {
 				obs.ref, err = obs.repository.GetRef("refs/tags/" + c)
-				if providers.ErrNotFound == err {
+				if prov.ErrNotFound == err {
 					obs.ref, err = obs.repository.GetTempRef(c)
 				}
 			}
@@ -142,7 +142,7 @@ func (fs *hubfs) release(obs *obstack) {
 	}
 }
 
-func (fs *hubfs) getattr(obs *obstack, entry providers.TreeEntry, path string, stat *fuse.Stat_t) (
+func (fs *hubfs) getattr(obs *obstack, entry prov.TreeEntry, path string, stat *fuse.Stat_t) (
 	target string) {
 
 	if nil != entry {
@@ -426,7 +426,7 @@ func (self *hubfs) Statfs(path string, stat *fuse.Statfs_t) (errc int) {
 
 func fuseErrc(err error) (errc int) {
 	errc = -fuse.EIO
-	if providers.ErrNotFound == err {
+	if prov.ErrNotFound == err {
 		errc = -fuse.ENOENT
 	}
 	return

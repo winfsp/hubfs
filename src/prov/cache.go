@@ -11,7 +11,7 @@
  * Software Foundation.
  */
 
-package providers
+package prov
 
 import (
 	"strings"
