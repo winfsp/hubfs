@@ -101,7 +101,7 @@ When you use the MSI installer under Windows there is better integration of HUBF
 
 ## How to build
 
-In order to build HUBFS run `make` from the project's root directory. On Windows you will have to run `.\make`. The build prerequisites for individual platforms are listed below:
+In order to build HUBFS run `build/make`. The build prerequisites for individual platforms are listed below:
 
 - Windows: [Go 1.16](https://golang.org/dl/), [WinFsp](https://github.com/winfsp/winfsp), gcc (e.g. from [Mingw-builds](http://mingw-w64.org/doku.php/download))
 
