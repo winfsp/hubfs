@@ -172,8 +172,8 @@ func run() int {
 		if "" != MyProductTag {
 			name += " " + MyProductTag
 		}
-		fmt.Printf("%s - %s - %s (%s)\nCopyright %s\n",
-			name, MyDescription, MyProductVersion, MyVersion,
+		fmt.Printf("%s %s (%s) - %s\nCopyright %s\n",
+			name, MyProductVersion, MyVersion, MyDescription,
 			MyCopyright)
 		return 0
 	}

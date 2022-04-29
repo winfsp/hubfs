@@ -49,8 +49,10 @@ GoBuild = $(BldDir)gobuild.mac
 endif
 
 GoBuildTags =
+TagInfix =
 ifdef TAG
 GoBuildTags = -tags $(TAG)
+TagInfix = -$(TAG)
 endif
 
 .PHONY: default
@@ -85,22 +87,23 @@ test:
 dist: build
 ifeq ($(OS),Windows_NT)
 	powershell -NoProfile -NonInteractive -ExecutionPolicy Unrestricted \
-		"Compress-Archive -Force -Path $(OutDir)hubfs.exe -DestinationPath $(OutDir)hubfs-win-$(MyVersion).zip"
+		"Compress-Archive -Force -Path $(OutDir)hubfs.exe -DestinationPath $(OutDir)hubfs$(TagInfix)-win-$(MyVersion).zip"
 	candle -nologo -arch x64 -pedantic \
+		-dMyProductName=$(MyProductName) \
+		-dMyProductTag=$(MyProductTag) \
+		-dMyDescription=$(MyDescription) \
+		-dMyCompanyName=$(MyCompanyName) \
 		-dMyVersion=$(MyVersion) \
 		-dMyProductVersion=$(MyProductVersion) \
 		-dMyProductStage=$(MyProductStage) \
-		-dMyProductName=$(MyProductName) \
-		-dMyDescription=$(MyDescription) \
-		-dMyCompanyName=$(MyCompanyName) \
-		-dMyArch=x64 \
-		-o $(OutDir)hubfs.wixobj \
+		-o $(OutDir)hubfs$(TagInfix).wixobj \
 		$(BldDir)hubfs.wxs
 	light -nologo \
 		-ext WixUIExtension \
+		-sice:ICE61 \
 		-spdb \
-		-o $(OutDir)hubfs-win-$(MyVersion).msi \
-		$(OutDir)hubfs.wixobj
+		-o $(OutDir)hubfs$(TagInfix)-win-$(MyVersion).msi \
+		$(OutDir)hubfs$(TagInfix).wixobj
 	signtool sign \
 		/ac $(MyCrossCert) \
 		/i $(MyCertIssuer) \
@@ -108,14 +111,14 @@ ifeq ($(OS),Windows_NT)
 		/d $(MyDescription) \
 		/fd sha1 \
 		/t http://timestamp.digicert.com \
-		$(OutDir)hubfs-win-$(MyVersion).msi || \
+		$(OutDir)hubfs$(TagInfix)-win-$(MyVersion).msi || \
 		echo "SIGNING FAILED! The product has been successfully built, but not signed." 1>&2
 endif
 ifeq ($(OS),Linux)
-	rm -f $(OutDir)hubfs-lnx-$(MyVersion).zip
-	zip $(OutDir)hubfs-lnx-$(MyVersion).zip $(OutDir)hubfs
+	rm -f $(OutDir)hubfs$(TagInfix)-lnx-$(MyVersion).zip
+	zip $(OutDir)hubfs$(TagInfix)-lnx-$(MyVersion).zip $(OutDir)hubfs
 endif
 ifeq ($(OS),Darwin)
-	rm -f $(OutDir)hubfs-mac-$(MyVersion).zip
-	zip $(OutDir)hubfs-mac-$(MyVersion).zip $(OutDir)hubfs
+	rm -f $(OutDir)hubfs$(TagInfix)-mac-$(MyVersion).zip
+	zip $(OutDir)hubfs$(TagInfix)-mac-$(MyVersion).zip $(OutDir)hubfs
 endif
