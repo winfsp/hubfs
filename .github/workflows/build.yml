@@ -56,7 +56,7 @@ jobs:
         env:
           GOARCHLIST: amd64 arm64
         run: |
-          ./build/make dist
+          build/make dist
 
       - name: Upload redistributables
         uses: actions/upload-artifact@v2

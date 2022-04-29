@@ -108,7 +108,7 @@ jobs:
 
       - name: Build HUBFS
         run: |
-          ./build/make dist
+          build/make dist
 
       - name: Test HUBFS packages (Windows)
         if: runner.os == 'Windows'
@@ -214,7 +214,7 @@ jobs:
           Start-Process -NoNewWindow .\build\out\hubfs.exe "-auth token=$env:HUBFS_TOKEN github.com X:"
           Start-Sleep 3
           Push-Location X:\winfsp\hubfs\master
-          .\make.cmd dist
+          build/make dist
           Stop-Process -Name hubfs
           Start-Sleep 3
           Pop-Location
@@ -230,7 +230,7 @@ jobs:
 
           ./build/out/hubfs -auth token=$HUBFS_TOKEN github.com mnt &
           sleep 3
-          (cd mnt/winfsp/hubfs/master && make dist)
+          (cd mnt/winfsp/hubfs/master && build/make dist)
           sudo umount mnt
 
           rmdir mnt
