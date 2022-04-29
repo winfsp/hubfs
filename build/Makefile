@@ -80,7 +80,7 @@ ifeq ($(OS),Windows_NT)
 		-dMyCompanyName=$(MyCompanyName) \
 		-dMyArch=x64 \
 		-o $(OutDir)hubfs.wixobj \
-		hubfs.wxs
+		$(BldDir)hubfs.wxs
 	light -nologo \
 		-ext WixUIExtension \
 		-spdb \
