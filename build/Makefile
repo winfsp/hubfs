@@ -58,12 +58,12 @@ build:
 
 .PHONY: racy
 racy:
-	cd src && \
+	cd $(SrcDir) && \
 	go build -race -o $(OutDir)hubfs$(ExeSuffix)
 
 .PHONY: test
 test:
-	cd src && \
+	cd $(SrcDir) && \
 	go test -count=1 ./...
 
 .PHONY: dist
