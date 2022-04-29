@@ -77,7 +77,7 @@
                     KeyPath="yes" />
             </Component>
             <Component Id="C.License.txt">
-                <File Name="License.txt" Source="License.txt" KeyPath="yes" />
+                <File Name="License.txt" Source="../License.txt" KeyPath="yes" />
             </Component>
             <Component Id="C.hubfs.exe">
                 <File Name="hubfs.exe" Source="hubfs.exe" KeyPath="yes" />
@@ -138,8 +138,8 @@
             <ComponentRef Id="C.hubfs.reg" />
         </Feature>
 
-        <WixVariable Id="WixUIBannerBmp" Value="art/wixbanner.bmp" />
-        <WixVariable Id="WixUIDialogBmp" Value="art/wixdialog-$(var.MyProductStage).bmp" />
+        <WixVariable Id="WixUIBannerBmp" Value="../art/wixbanner.bmp" />
+        <WixVariable Id="WixUIDialogBmp" Value="../art/wixdialog-$(var.MyProductStage).bmp" />
         <UI Id="FeatureTree">
             <UIRef Id="WixUI_FeatureTree" />
             <!-- skip the license agreement dialog; higher Order takes priority (weird) -->

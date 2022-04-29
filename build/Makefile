@@ -1,33 +1,43 @@
-# Makefile
-
-MyBuildNumber = $(shell date +%y%j)
-MyVersion = 1.0.$(MyBuildNumber)
-MyProductVersion = "2022 Beta2"
-MyProductStage = "Beta"
+# Makefile for Hubfs
+#
+# Copyright 2021-2022 Bill Zissimopoulos
+#
+# This file is part of Hubfs.
+#
+# You can redistribute it and/or modify it under the terms of the GNU
+# Affero General Public License version 3 as published by the Free
+# Software Foundation.
 
 MyProductName = "HUBFS"
 MyDescription = "File system for GitHub"
 MyCopyright = "2021-2022 Bill Zissimopoulos"
 MyCompanyName = "Navimatics LLC"
+MyCertIssuer = "DigiCert"
+MyCrossCert = "DigiCert High Assurance EV Root CA.crt"
+MyBuildNumber = $(shell date +%y%j)
+MyVersion = 1.0.$(MyBuildNumber)
+MyProductVersion = "2022 Beta2"
+MyProductStage = "Beta"
 
-CertIssuer = "DigiCert"
-CrossCert = "DigiCert High Assurance EV Root CA.crt"
+BldDir = $(dir $(realpath $(lastword $(MAKEFILE_LIST))))
+SrcDir = $(BldDir)../src/
+ExtDir = $(BldDir)../ext/
+OutDir = $(BldDir)out/
 
 ifneq ($(OS),Windows_NT)
-	OS=$(shell uname)
+	OS = $(shell uname)
 endif
 
-ExeSuffix=
+GoBuild = go build
+ExeSuffix =
 ifeq ($(OS),Windows_NT)
-	GoBuild=go build
-	ExeSuffix=.exe
+	ExeSuffix = .exe
 endif
 ifeq ($(OS),Linux)
-	GoBuild=go build
-	export CGO_CFLAGS=-include $(dir $(realpath $(lastword $(MAKEFILE_LIST))))ext/glibc-compat/glibc-2.17.h
+	export CGO_CFLAGS=-include $(ExtDir)glibc-compat/glibc-2.17.h
 endif
 ifeq ($(OS),Darwin)
-	GoBuild=../gobuild.mac
+	GoBuild = $(BldDir)gobuild.mac
 endif
 
 .PHONY: default
@@ -35,7 +45,7 @@ default: build
 
 .PHONY: build
 build:
-	cd src && \
+	cd $(SrcDir) && \
 	$(GoBuild) \
 		-ldflags "-s -w \
 			-X \"main.MyVersion=$(subst $\",,$(MyVersion))\" \
@@ -44,12 +54,12 @@ build:
 			-X \"main.MyDescription=$(subst $\",,$(MyDescription))\" \
 			-X \"main.MyCopyright=$(subst $\",,$(MyCopyright))\" \
 			" \
-		-o ../hubfs$(ExeSuffix)
+		-o $(OutDir)hubfs$(ExeSuffix)
 
 .PHONY: racy
 racy:
 	cd src && \
-	go build -race -o ../hubfs$(ExeSuffix)
+	go build -race -o $(OutDir)hubfs$(ExeSuffix)
 
 .PHONY: test
 test:
@@ -60,7 +70,7 @@ test:
 dist: build
 ifeq ($(OS),Windows_NT)
 	powershell -NoProfile -NonInteractive -ExecutionPolicy Unrestricted \
-		"Compress-Archive -Force -Path hubfs.exe -DestinationPath .\hubfs-win-$(MyVersion).zip"
+		"Compress-Archive -Force -Path $(OutDir)hubfs.exe -DestinationPath $(OutDir)hubfs-win-$(MyVersion).zip"
 	candle -nologo -arch x64 -pedantic \
 		-dMyVersion=$(MyVersion) \
 		-dMyProductVersion=$(MyProductVersion) \
@@ -69,30 +79,28 @@ ifeq ($(OS),Windows_NT)
 		-dMyDescription=$(MyDescription) \
 		-dMyCompanyName=$(MyCompanyName) \
 		-dMyArch=x64 \
-		-o hubfs.wixobj \
+		-o $(OutDir)hubfs.wixobj \
 		hubfs.wxs
 	light -nologo \
 		-ext WixUIExtension \
 		-spdb \
-		-o hubfs-win-$(MyVersion).msi \
-		hubfs.wixobj
-	powershell -NoProfile -NonInteractive -ExecutionPolicy Unrestricted \
-		"Remove-Item -Force hubfs.wixobj"
+		-o $(OutDir)hubfs-win-$(MyVersion).msi \
+		$(OutDir)hubfs.wixobj
 	signtool sign \
-		/ac $(CrossCert) \
-		/i $(CertIssuer) \
+		/ac $(MyCrossCert) \
+		/i $(MyCertIssuer) \
 		/n $(MyCompanyName) \
 		/d $(MyDescription) \
 		/fd sha1 \
 		/t http://timestamp.digicert.com \
-		hubfs-win-$(MyVersion).msi || \
+		$(OutDir)hubfs-win-$(MyVersion).msi || \
 		echo "SIGNING FAILED! The product has been successfully built, but not signed." 1>&2
 endif
 ifeq ($(OS),Linux)
-	rm -f hubfs-lnx-$(MyVersion).zip
-	zip hubfs-lnx-$(MyVersion).zip hubfs
+	rm -f $(OutDir)hubfs-lnx-$(MyVersion).zip
+	zip $(OutDir)hubfs-lnx-$(MyVersion).zip $(OutDir)hubfs
 endif
 ifeq ($(OS),Darwin)
-	rm -f hubfs-mac-$(MyVersion).zip
-	zip hubfs-mac-$(MyVersion).zip hubfs
+	rm -f $(OutDir)hubfs-mac-$(MyVersion).zip
+	zip $(OutDir)hubfs-mac-$(MyVersion).zip $(OutDir)hubfs
 endif

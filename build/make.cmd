@@ -20,4 +20,4 @@ for /f %%d in ('powershell -NoProfile -NonInteractive -ExecutionPolicy Unrestric
     set MyBuildNumber=%%d
 )
 
-mingw32-make MyBuildNumber=%MyBuildNumber% %*
+mingw32-make -C %~dp0 MyBuildNumber=%MyBuildNumber% %*

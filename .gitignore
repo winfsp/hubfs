@@ -1,5 +1,2 @@
 .vscode
-*.exe
-*.msi
-*.zip
-/hubfs
+/build/out

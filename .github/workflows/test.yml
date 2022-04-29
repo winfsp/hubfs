@@ -106,15 +106,9 @@ jobs:
           rm secfs.test/fstest/fstest/tests/truncate/03.t
           rm secfs.test/fstest/fstest/tests/unlink/03.t
 
-      - name: Build HUBFS (Windows)
-        if: runner.os == 'Windows'
+      - name: Build HUBFS
         run: |
-          .\make.cmd dist
-
-      - name: Build HUBFS (Linux / macOS)
-        if: runner.os == 'Linux' || runner.os == 'macOS'
-        run: |
-          make dist
+          ./build/make dist
 
       - name: Test HUBFS packages (Windows)
         if: runner.os == 'Windows'
@@ -217,7 +211,7 @@ jobs:
         run: |
           Set-PSDebug -Trace 1
 
-          Start-Process -NoNewWindow .\hubfs.exe "-auth token=$env:HUBFS_TOKEN github.com X:"
+          Start-Process -NoNewWindow .\build\out\hubfs.exe "-auth token=$env:HUBFS_TOKEN github.com X:"
           Start-Sleep 3
           Push-Location X:\winfsp\hubfs\master
           .\make.cmd dist
@@ -234,7 +228,7 @@ jobs:
 
           mkdir mnt
 
-          ./hubfs -auth token=$HUBFS_TOKEN github.com mnt &
+          ./build/out/hubfs -auth token=$HUBFS_TOKEN github.com mnt &
           sleep 3
           (cd mnt/winfsp/hubfs/master && make dist)
           sudo umount mnt

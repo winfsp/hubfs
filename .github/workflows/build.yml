@@ -52,20 +52,16 @@ jobs:
           # see https://github.com/actions/virtual-environments/issues/4731
           brew install macfuse
 
-      - name: Build HUBFS (Windows)
-        if: runner.os == 'Windows'
+      - name: Build HUBFS
+        env:
+          GOARCHLIST: amd64 arm64
         run: |
-          .\make.cmd dist
-
-      - name: Build HUBFS (Linux / macOS)
-        if: runner.os == 'Linux' || runner.os == 'macOS'
-        run: |
-          make dist
+          ./build/make dist
 
       - name: Upload redistributables
         uses: actions/upload-artifact@v2
         with:
           name: Redistributables
           path: |
-            hubfs-*-*.msi
-            hubfs-*-*.zip
+            build/out/hubfs-*-*.msi
+            build/out/hubfs-*-*.zip
