@@ -32,11 +32,12 @@ import (
 )
 
 var (
-	MyVersion        = "DEVVER"
-	MyProductVersion = "PRDVER"
 	MyProductName    = "HUBFS"
 	MyDescription    = "File system for GitHub"
 	MyCopyright      = "2021-2022 Bill Zissimopoulos"
+	MyVersion        = "DEVVER"
+	MyProductVersion = "PRDVER"
+	MyProductTag     = ""
 )
 
 var progname = strings.TrimSuffix(filepath.Base(os.Args[0]), ".exe")
@@ -167,8 +168,12 @@ func run() int {
 	flag.Parse()
 
 	if printver {
-		fmt.Printf("%s - %s - version %s (%s)\nCopyright %s\n",
-			MyProductName, MyDescription, MyProductVersion, MyVersion,
+		name := MyProductName
+		if "" != MyProductTag {
+			name += " " + MyProductTag
+		}
+		fmt.Printf("%s - %s - %s (%s)\nCopyright %s\n",
+			name, MyDescription, MyProductVersion, MyVersion,
 			MyCopyright)
 		return 0
 	}

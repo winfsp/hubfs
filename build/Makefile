@@ -19,25 +19,38 @@ MyVersion = 1.0.$(MyBuildNumber)
 MyProductVersion = "2022 Beta2"
 MyProductStage = "Beta"
 
+ifeq ($(TAG),)
+MyProductTag = ""
+else ifeq ($(TAG),pro)
+MyProductTag = "Professional"
+else ifeq ($(TAG),ent)
+MyProductTag = "Enterprise"
+else
+$(error invalid TAG; possible options: <empty> pro ent)
+endif
+
 BldDir = $(dir $(realpath $(lastword $(MAKEFILE_LIST))))
 SrcDir = $(BldDir)../src/
 ExtDir = $(BldDir)../ext/
 OutDir = $(BldDir)out/
 
 ifneq ($(OS),Windows_NT)
-	OS = $(shell uname)
+OS = $(shell uname)
 endif
 
 GoBuild = go build
 ExeSuffix =
 ifeq ($(OS),Windows_NT)
-	ExeSuffix = .exe
+ExeSuffix = .exe
+else ifeq ($(OS),Linux)
+export CGO_CFLAGS=-include $(ExtDir)glibc-compat/glibc-2.17.h
+else ifeq ($(OS),Darwin)
+GoBuild = $(BldDir)gobuild.mac
 endif
-ifeq ($(OS),Linux)
-	export CGO_CFLAGS=-include $(ExtDir)glibc-compat/glibc-2.17.h
-endif
-ifeq ($(OS),Darwin)
-	GoBuild = $(BldDir)gobuild.mac
+
+GoBuildTags =
+ifdef TAG
+GoBuildTags = -tags $(TAG)
 endif
 
 .PHONY: default
@@ -47,24 +60,26 @@ default: build
 build:
 	cd $(SrcDir) && \
 	$(GoBuild) \
+		$(GoBuildTags) \
 		-ldflags "-s -w \
-			-X \"main.MyVersion=$(subst $\",,$(MyVersion))\" \
-			-X \"main.MyProductVersion=$(subst $\",,$(MyProductVersion))\" \
 			-X \"main.MyProductName=$(subst $\",,$(MyProductName))\" \
 			-X \"main.MyDescription=$(subst $\",,$(MyDescription))\" \
 			-X \"main.MyCopyright=$(subst $\",,$(MyCopyright))\" \
+			-X \"main.MyVersion=$(subst $\",,$(MyVersion))\" \
+			-X \"main.MyProductVersion=$(subst $\",,$(MyProductVersion))\" \
+			-X \"main.MyProductTag=$(subst $\",,$(MyProductTag))\" \
 			" \
 		-o $(OutDir)hubfs$(ExeSuffix)
 
 .PHONY: racy
 racy:
 	cd $(SrcDir) && \
-	go build -race -o $(OutDir)hubfs$(ExeSuffix)
+	go build $(GoBuildTags) -race -o $(OutDir)hubfs$(ExeSuffix)
 
 .PHONY: test
 test:
 	cd $(SrcDir) && \
-	go test -count=1 ./...
+	go test $(GoBuildTags) -count=1 ./...
 
 .PHONY: dist
 dist: build
