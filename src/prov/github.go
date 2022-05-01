@@ -39,7 +39,7 @@ type GithubProvider struct {
 	ApiURI       string
 }
 
-func NewGithubProvider() *GithubProvider {
+func NewGithubComProvider(uri *url.URL) Provider {
 	return &GithubProvider{
 		Hostname:     "github.com",
 		ClientId:     "4c24e0557d7103e3c4b0", // safe to embed
@@ -48,6 +48,10 @@ func NewGithubProvider() *GithubProvider {
 		Scopes:       "repo",
 		ApiURI:       "https://api.github.com",
 	}
+}
+
+func init() {
+	RegisterProviderCtor("github.com", NewGithubComProvider)
 }
 
 func (provider *GithubProvider) Auth() (token string, err error) {
@@ -68,11 +72,6 @@ func (provider *GithubProvider) Auth() (token string, err error) {
 
 func (provider *GithubProvider) NewClient(token string) (Client, error) {
 	return NewGithubClient(provider.ApiURI, token)
-}
-
-func init() {
-	provider := NewGithubProvider()
-	RegisterProvider("https://"+provider.Hostname, provider)
 }
 
 type githubClient struct {

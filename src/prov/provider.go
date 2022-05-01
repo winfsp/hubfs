@@ -17,6 +17,7 @@ import (
 	"errors"
 	"io"
 	"net/url"
+	"sort"
 	"sync"
 	"time"
 
@@ -75,27 +76,48 @@ type TreeEntry interface {
 
 var ErrNotFound = errors.New("not found")
 
-var lock sync.RWMutex
-var providers = make(map[string]Provider)
+var regmutex sync.RWMutex
+var registry = make(map[string]func(uri *url.URL) Provider)
 
-func GetProviderName(uri *url.URL) string {
-	u := &url.URL{
-		Scheme: uri.Scheme,
-		Host:   uri.Host,
+func RegisterProviderCtor(name string, ctor func(uri *url.URL) Provider) {
+	regmutex.Lock()
+	defer regmutex.Unlock()
+	registry[name] = ctor
+}
+
+func GetProviderClassNames() (names []string) {
+	regmutex.RLock()
+	defer regmutex.RUnlock()
+	names = make([]string, 0, len(registry))
+	for n := range registry {
+		names = append(names, n)
 	}
-	return u.String()
+	sort.Strings(names)
+	return
 }
 
-func GetProvider(name string) Provider {
-	lock.RLock()
-	defer lock.RUnlock()
-	return providers[name]
+func GetProviderInstanceName(uri *url.URL) string {
+	regmutex.RLock()
+	defer regmutex.RUnlock()
+	ctor := registry[uri.Host]
+	if nil != ctor {
+		return uri.Host
+	}
+	return uri.Scheme + "://" + uri.Host
 }
 
-func RegisterProvider(name string, provider Provider) {
-	lock.Lock()
-	defer lock.Unlock()
-	providers[name] = provider
+func NewProviderInstance(uri *url.URL) Provider {
+	regmutex.RLock()
+	defer regmutex.RUnlock()
+	ctor := registry[uri.Host]
+	if nil != ctor {
+		return ctor(uri)
+	}
+	ctor = registry[uri.Scheme+":"]
+	if nil != ctor {
+		return ctor(uri)
+	}
+	return nil
 }
 
 func trace(vals ...interface{}) func(vals ...interface{}) {

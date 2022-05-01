@@ -172,9 +172,11 @@ func run() int {
 		if "" != MyProductTag {
 			name += " " + MyProductTag
 		}
-		fmt.Printf("%s %s (%s) - %s\nCopyright %s\n",
-			name, MyProductVersion, MyVersion, MyDescription,
-			MyCopyright)
+		fmt.Printf("%s %s (%s) - %s\nCopyright %s\n\nProviders:\n",
+			name, MyProductVersion, MyVersion, MyDescription, MyCopyright)
+		for _, n := range prov.GetProviderClassNames() {
+			fmt.Printf("  %s\n", n)
+		}
 		return 0
 	}
 
@@ -221,15 +223,14 @@ func run() int {
 		return 1
 	}
 
-	provname := prov.GetProviderName(uri)
-	provider := prov.GetProvider(provname)
+	provider := prov.NewProviderInstance(uri)
 	if nil == provider {
-		warn("unknown provider: %s", provname)
+		warn("unknown provider: %s", prov.GetProviderInstanceName(uri))
 		return 1
 	}
 
 	if "" == authkey {
-		authkey = provname
+		authkey = prov.GetProviderInstanceName(uri)
 	}
 
 	var client prov.Client
