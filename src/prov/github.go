@@ -56,7 +56,7 @@ func init() {
 
 func (provider *GithubProvider) Auth() (token string, err error) {
 	flow := &oauth.Flow{
-		Hostname:     provider.Hostname,
+		Host:         oauth.GitHubHost("https://" + provider.Hostname),
 		ClientID:     provider.ClientId,
 		ClientSecret: provider.ClientSecret,
 		CallbackURI:  provider.CallbackURI,
