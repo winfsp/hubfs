@@ -14,6 +14,7 @@
 package httputil
 
 import (
+	"crypto/tls"
 	"net/http"
 	"time"
 
@@ -24,12 +25,21 @@ var (
 	DefaultRetryCount = 10
 	DefaultSleep      = time.Second
 	DefaultMaxSleep   = time.Second * 30
-	DefaultClient     = &http.Client{
+	DefaultClient     *http.Client
+	DefaultTransport  *http.Transport
+)
+
+func init() {
+	DefaultTransport = http.DefaultTransport.(*http.Transport).Clone()
+	if nil == DefaultTransport.TLSClientConfig {
+		DefaultTransport.TLSClientConfig = &tls.Config{}
+	}
+	DefaultClient = &http.Client{
 		Transport: &transport{
-			RoundTripper: http.DefaultTransport,
+			RoundTripper: DefaultTransport,
 		},
 	}
-)
+}
 
 type transport struct {
 	http.RoundTripper

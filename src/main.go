@@ -28,6 +28,7 @@ import (
 	"github.com/winfsp/cgofuse/fuse"
 	"github.com/winfsp/hubfs/fs/hubfs"
 	"github.com/winfsp/hubfs/fs/port"
+	"github.com/winfsp/hubfs/httputil"
 	"github.com/winfsp/hubfs/prov"
 )
 
@@ -129,6 +130,7 @@ func run() int {
 
 	debug := false
 	printver := false
+	insecure := false
 	authmeth := "full"
 	authkey := ""
 	authonly := false
@@ -146,6 +148,7 @@ func run() int {
 
 	flag.BoolVar(&debug, "d", debug, "debug output")
 	flag.BoolVar(&printver, "version", printver, "print version information")
+	flag.BoolVar(&insecure, "insecure", insecure, "skip TLS server cert verification")
 	flag.StringVar(&authmeth, "auth", "",
 		"`method` is from list below; auth tokens are stored in system keyring\n"+
 			"- force     perform interactive auth even if token present\n"+
@@ -212,6 +215,10 @@ func run() int {
 	if debug {
 		libtrace.Verbose = true
 		libtrace.Pattern = "*,github.com/winfsp/hubfs/*,github.com/winfsp/hubfs/fs/*"
+	}
+
+	if insecure {
+		httputil.DefaultTransport.TLSClientConfig.InsecureSkipVerify = true
 	}
 
 	uri, err := url.Parse(remote)
