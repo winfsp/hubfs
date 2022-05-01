@@ -14,6 +14,7 @@
 package prov
 
 import (
+	"net/url"
 	"os"
 	"testing"
 	"time"
@@ -176,7 +177,8 @@ func init() {
 			token = os.Getenv("HUBFS_TOKEN")
 		}
 
-		client, err = GetProvider("https://github.com").NewClient(token)
+		uri, _ := url.Parse("https://github.com")
+		client, err = NewProviderInstance(uri).NewClient(token)
 		if nil != err {
 			return err
 		}
