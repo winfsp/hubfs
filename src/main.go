@@ -144,6 +144,10 @@ func run() int {
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "usage: %s [options] [remote] mountpoint\n\n", progname)
 		flag.PrintDefaults()
+		fmt.Fprintf(os.Stderr, "\nremotes:\n")
+		for _, n := range prov.GetProviderClassNames() {
+			fmt.Printf("  %s\n", prov.GetProviderClassHelp(n))
+		}
 	}
 
 	flag.BoolVar(&debug, "d", debug, "debug output")

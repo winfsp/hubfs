@@ -51,7 +51,11 @@ func NewGithubComProvider(uri *url.URL) Provider {
 }
 
 func init() {
-	RegisterProviderCtor("github.com", NewGithubComProvider)
+	RegisterProviderClass("github.com", NewGithubComProvider, ""+
+		"[https://]github.com[/owner[/repo]]\n"+
+		"    \taccess github.com\n"+
+		"    \t- owner     file system root is at owner\n"+
+		"    \t- repo      file system root is at owner/repo")
 }
 
 func (provider *GithubProvider) Auth() (token string, err error) {

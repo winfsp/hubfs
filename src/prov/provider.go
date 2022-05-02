@@ -78,11 +78,13 @@ var ErrNotFound = errors.New("not found")
 
 var regmutex sync.RWMutex
 var registry = make(map[string]func(uri *url.URL) Provider)
+var reghelp = make(map[string]string)
 
-func RegisterProviderCtor(name string, ctor func(uri *url.URL) Provider) {
+func RegisterProviderClass(name string, ctor func(uri *url.URL) Provider, help string) {
 	regmutex.Lock()
 	defer regmutex.Unlock()
 	registry[name] = ctor
+	reghelp[name] = help
 }
 
 func GetProviderClassNames() (names []string) {
@@ -94,6 +96,12 @@ func GetProviderClassNames() (names []string) {
 	}
 	sort.Strings(names)
 	return
+}
+
+func GetProviderClassHelp(name string) string {
+	regmutex.RLock()
+	defer regmutex.RUnlock()
+	return reghelp[name]
 }
 
 func GetProviderInstanceName(uri *url.URL) string {
