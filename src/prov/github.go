@@ -14,12 +14,14 @@
 package prov
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
 	"os"
+	pathutil "path"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -81,6 +83,7 @@ func (provider *GithubProvider) NewClient(token string) (Client, error) {
 type githubClient struct {
 	httpClient *http.Client
 	apiURI     string
+	gqlApiURI  string
 	token      string
 	login      string
 	dir        string
@@ -112,8 +115,16 @@ func NewGithubClient(apiURI string, token string) (Client, error) {
 	client := &githubClient{
 		httpClient: httputil.DefaultClient,
 		apiURI:     apiURI,
+		gqlApiURI:  apiURI + "/graphql",
 		token:      token,
 	}
+
+	if uri, err := url.Parse(apiURI); nil == err {
+		if m, _ := pathutil.Match("/api/v*", uri.Path); m {
+			client.gqlApiURI = uri.Scheme + "://" + uri.Host + "/api/graphql"
+		}
+	}
+
 	client.cache = newCache(&client.lock)
 	client.cache.Value = client
 
@@ -222,6 +233,42 @@ func (client *githubClient) sendrecv(path string) (*http.Response, error) {
 	return rsp, nil
 }
 
+func (client *githubClient) sendrecvGql(query string) (*http.Response, error) {
+	var content = struct {
+		Query string `json:"query"`
+	}{
+		Query: query,
+	}
+	var body bytes.Buffer
+	err := json.NewEncoder(&body).Encode(&content)
+	if nil != err {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", client.gqlApiURI, &body)
+	if nil != err {
+		return nil, err
+	}
+
+	req.Header.Set("Content-type", "application/json")
+	if "" != client.token {
+		req.Header.Set("Authorization", "token "+client.token)
+	}
+
+	rsp, err := client.httpClient.Do(req)
+	if nil != err {
+		return nil, err
+	}
+
+	if 404 == rsp.StatusCode {
+		return nil, ErrNotFound
+	} else if 400 <= rsp.StatusCode {
+		return nil, errors.New(fmt.Sprintf("HTTP %d", rsp.StatusCode))
+	}
+
+	return rsp, nil
+}
+
 func (client *githubClient) getOwner(owner string) (res *githubOwner, err error) {
 	defer trace(owner)(&err)
 
@@ -242,7 +289,7 @@ func (client *githubClient) getOwner(owner string) (res *githubOwner, err error)
 	return &content, nil
 }
 
-func (client *githubClient) getRepositoryPage(path string) ([]*githubRepository, error) {
+func (client *githubClient) getRepositoryPageRest(path string) ([]*githubRepository, error) {
 	rsp, err := client.sendrecv(path)
 	if nil != err {
 		return nil, err
@@ -264,7 +311,7 @@ func (client *githubClient) getRepositoryPage(path string) ([]*githubRepository,
 	return content, nil
 }
 
-func (client *githubClient) getRepositories(owner string, isorg bool) (res []*githubRepository, err error) {
+func (client *githubClient) getRepositoriesRest(owner string, isorg bool) (res []*githubRepository, err error) {
 	defer trace(owner)(&err)
 
 	var path string
@@ -278,7 +325,7 @@ func (client *githubClient) getRepositories(owner string, isorg bool) (res []*gi
 
 	res = make([]*githubRepository, 0)
 	for page := 1; ; page++ {
-		lst, err := client.getRepositoryPage(path + fmt.Sprintf("&page=%d", page))
+		lst, err := client.getRepositoryPageRest(path + fmt.Sprintf("&page=%d", page))
 		if nil != err {
 			return nil, err
 		}
@@ -289,6 +336,129 @@ func (client *githubClient) getRepositories(owner string, isorg bool) (res []*gi
 	}
 
 	return res, nil
+}
+
+func (client *githubClient) getRepositoryPageGql(query string) ([]*githubRepository, string, error) {
+	rsp, err := client.sendrecvGql(query)
+	if nil != err {
+		return nil, "", err
+	}
+	defer rsp.Body.Close()
+
+	var content struct {
+		Data struct {
+			Owner struct {
+				Repositories struct {
+					PageInfo struct {
+						HasNextPage bool   `json:"hasNextPage"`
+						EndCursor   string `json:"endCursor"`
+					} `json:"pageInfo"`
+					Nodes []*githubRepository `json:"nodes"`
+				} `json:"repositories"`
+			} `json:"owner"`
+		} `json:"data"`
+		Errors []struct {
+			Message string `json:"message"`
+		} `json:"errors"`
+	}
+	err = json.NewDecoder(rsp.Body).Decode(&content)
+	if nil != err {
+		return nil, "", err
+	}
+	if 0 < len(content.Errors) {
+		return nil, "", errors.New(fmt.Sprintf("GraphQL: %s", content.Errors[0].Message))
+	}
+
+	for _, elm := range content.Data.Owner.Repositories.Nodes {
+		elm.Value = elm
+		elm.Repository = emptyRepository
+		elm.keepdir = client.keepdir
+	}
+
+	crs := ""
+	if content.Data.Owner.Repositories.PageInfo.HasNextPage {
+		crs = content.Data.Owner.Repositories.PageInfo.EndCursor
+	}
+
+	return content.Data.Owner.Repositories.Nodes, crs, nil
+}
+
+func (client *githubClient) getRepositoriesGql(owner string, isorg bool) (res []*githubRepository, err error) {
+	defer trace(owner)(&err)
+
+	query := `{
+		owner: %s {
+			repositories(ownerAffiliations: OWNER, first: 100%%s) {
+				pageInfo {
+					hasNextPage
+					endCursor
+				}
+				nodes {
+					name
+					clone_url: url
+				}
+			}
+		}
+	}`
+
+	if client.login == owner {
+		query = fmt.Sprintf(query, "viewer")
+	} else {
+		query = fmt.Sprintf(query, `repositoryOwner(login: "`+owner+`")`)
+	}
+
+	res = make([]*githubRepository, 0)
+	var lst []*githubRepository
+	var crs string
+	for {
+		if "" != crs {
+			crs = `, after: "` + crs + `"`
+		}
+		lst, crs, err = client.getRepositoryPageGql(fmt.Sprintf(query, crs))
+		if nil != err {
+			return nil, err
+		}
+		res = append(res, lst...)
+		if "" == crs {
+			break
+		}
+	}
+
+	return res, nil
+}
+
+func (client *githubClient) getRepositories(owner string, isorg bool) (res []*githubRepository, err error) {
+	if "" != client.token {
+		/*
+		 * Attempt to list repositories via a GraphQL query because they are much faster for large
+		 * listings than REST. For example, listing the GitHub microsoft account takes 1m26s(!)
+		 * using REST, but "only" 18s using GraphQL.
+		 *
+		 * There are however some problems with using GraphQL:
+		 *
+		 * 1. GraphQL requires authentication.
+		 *
+		 * 2. Even with authentication GraphQL queries can sometimes fail with OAuth credentials.
+		 * The following error message is possible: "Although you appear to have the correct
+		 * authorization credentials, the `NAME` organization has enabled OAuth App access
+		 * restrictions, meaning that data access to third-parties is limited. For more information
+		 * on these restrictions, including how to enable this app, visit
+		 * https://docs.github.com/articles/restricting-access-to-your-organization-s-data/"
+		 *
+		 * For this reason GraphQL queries are not reliable and we always fall back to REST when
+		 * encountering an error.
+		 *
+		 * An alternative solution to this problem was using multiple concurrent requests to fetch
+		 * the listing pages. Unfortunately the GitHub API discourages such use, because of
+		 * secondary rate limiting:
+		 * https://docs.github.com/en/rest/overview/resources-in-the-rest-api#secondary-rate-limits.
+		 */
+		res, err = client.getRepositoriesGql(owner, isorg)
+		if nil == err {
+			return
+		}
+	}
+	return client.getRepositoriesRest(owner, isorg)
 }
 
 func (client *githubClient) GetOwners() ([]Owner, error) {
