@@ -14,10 +14,12 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"net/url"
 	"os"
+	"os/exec"
 	"os/user"
 	"path/filepath"
 	"runtime"
@@ -74,7 +76,7 @@ func newClientWithKey(provider prov.Provider, authkey string) (
 	return
 }
 
-func authNewClientWithKey(provider prov.Provider, authkey string) (
+func oauthNewClientWithKey(provider prov.Provider, authkey string) (
 	client prov.Client, err error) {
 	token, err := provider.Auth()
 	if nil == err {
@@ -82,6 +84,28 @@ func authNewClientWithKey(provider prov.Provider, authkey string) (
 		if nil == err {
 			keyring.Set(MyProductName, authkey, token)
 		}
+	}
+	return
+}
+
+func gitauthNewClientWithUri(provider prov.Provider, uri *url.URL) (
+	client prov.Client, err error) {
+	cmd := exec.Command("git", "credential", "fill")
+	cmd.Stdin = strings.NewReader(fmt.Sprintf("protocol=https\nhost=%s\n", uri.Host))
+	out, err := cmd.Output()
+	if nil == err {
+		token := ""
+		for _, line := range strings.Split(string(out), "\n") {
+			t := strings.TrimPrefix(line, "password=")
+			if line != t {
+				token = t
+				break
+			}
+		}
+		if "" == token {
+			return nil, errors.New("gitauth: no password")
+		}
+		client, err = provider.NewClient(token)
 	}
 	return
 }
@@ -160,6 +184,7 @@ func run() int {
 			"- required  auth token required to be present\n"+
 			"- optional  auth token will be used if present\n"+
 			"- none      do not use auth token even if present\n"+
+			"- git       use `git credential` for auth; do not use system keyring\n"+
 			"- token=T   use specified auth token T; do not use system keyring")
 	flag.StringVar(&authkey, "authkey", authkey, "`name` of key that stores auth token in system keyring")
 	flag.BoolVar(&authonly, "authonly", authonly, "perform auth only; do not mount")
@@ -202,7 +227,7 @@ func run() int {
 	switch authmeth {
 	case "":
 		authmeth = "full"
-	case "force", "full", "required", "optional":
+	case "force", "full", "required", "optional", "git":
 	case "none":
 		if authonly {
 			flag.Usage()
@@ -247,11 +272,11 @@ func run() int {
 	var client prov.Client
 	switch authmeth {
 	case "force":
-		client, err = authNewClientWithKey(provider, authkey)
+		client, err = oauthNewClientWithKey(provider, authkey)
 	case "full":
 		client, err = newClientWithKey(provider, authkey)
 		if nil != err {
-			client, err = authNewClientWithKey(provider, authkey)
+			client, err = oauthNewClientWithKey(provider, authkey)
 		}
 	case "required":
 		client, err = newClientWithKey(provider, authkey)
@@ -262,6 +287,8 @@ func run() int {
 		}
 	case "none":
 		client, err = provider.NewClient("")
+	case "git":
+		client, err = gitauthNewClientWithUri(provider, uri)
 	default:
 		if strings.HasPrefix(authmeth, "token=") {
 			client, err = provider.NewClient(strings.TrimPrefix(authmeth, "token="))
