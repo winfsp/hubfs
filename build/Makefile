@@ -63,6 +63,7 @@ build:
 	cd $(SrcDir) && \
 	$(GoBuild) \
 		$(GoBuildTags) \
+		-trimpath \
 		-ldflags "-s -w \
 			-X \"main.MyProductName=$(subst $\",,$(MyProductName))\" \
 			-X \"main.MyDescription=$(subst $\",,$(MyDescription))\" \
