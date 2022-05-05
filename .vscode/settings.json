@@ -1,0 +1,8 @@
+{
+    "go.buildFlags": [
+        "-tags=ent"
+    ],
+    "go.toolsEnvVars": {
+        "CGO_ENABLED": "0"
+    }
+}
