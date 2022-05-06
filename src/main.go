@@ -32,6 +32,7 @@ import (
 	"github.com/winfsp/hubfs/fs/port"
 	"github.com/winfsp/hubfs/httputil"
 	"github.com/winfsp/hubfs/prov"
+	"github.com/winfsp/hubfs/util"
 )
 
 var (
@@ -170,7 +171,7 @@ func run() int {
 		flag.PrintDefaults()
 		fmt.Fprintf(os.Stderr, "\nremotes:\n")
 		for _, n := range prov.GetProviderClassNames() {
-			fmt.Printf("  %s\n", prov.GetProviderClassHelp(n))
+			fmt.Fprintf(os.Stderr, "  %s\n", prov.GetProviderClassHelp(n))
 		}
 	}
 
@@ -204,8 +205,10 @@ func run() int {
 		if "" != MyProductTag {
 			name += " " + MyProductTag
 		}
-		fmt.Printf("%s %s (%s) - %s\nCopyright %s\n\nProviders:\n",
+		fmt.Printf("%s %s (%s) - %s\nCopyright %s\n\n",
 			name, MyProductVersion, MyVersion, MyDescription, MyCopyright)
+		util.InvokeEvent("main.Printver", nil)
+		fmt.Printf("Providers:\n")
 		for _, n := range prov.GetProviderClassNames() {
 			fmt.Printf("  %s\n", n)
 		}
