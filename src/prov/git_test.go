@@ -31,11 +31,11 @@ const subtreeName = "src"
 const subentryName = "go.mod"
 const commitName = "865aad06c4ecde192460b429f810bb84c0d9ca7b"
 
-var repository Repository
+var testRepository Repository
 var caseins bool
 
 func TestGetRefs(t *testing.T) {
-	refs, err := repository.GetRefs()
+	refs, err := testRepository.GetRefs()
 	if nil != err {
 		t.Error(err)
 	}
@@ -50,7 +50,7 @@ func TestGetRefs(t *testing.T) {
 		t.Error()
 	}
 
-	refs, err = repository.GetRefs()
+	refs, err = testRepository.GetRefs()
 	if nil != err {
 		t.Error(err)
 	}
@@ -67,7 +67,7 @@ func TestGetRefs(t *testing.T) {
 }
 
 func TestGetRef(t *testing.T) {
-	ref, err := repository.GetRef(refName)
+	ref, err := testRepository.GetRef(refName)
 	if nil != err {
 		t.Error(err)
 	}
@@ -75,7 +75,7 @@ func TestGetRef(t *testing.T) {
 		t.Error()
 	}
 
-	ref, err = repository.GetRef(refName)
+	ref, err = testRepository.GetRef(refName)
 	if nil != err {
 		t.Error(err)
 	}
@@ -85,7 +85,7 @@ func TestGetRef(t *testing.T) {
 }
 
 func TestGetTempRef(t *testing.T) {
-	ref, err := repository.GetTempRef(commitName)
+	ref, err := testRepository.GetTempRef(commitName)
 	if nil != err {
 		t.Error(err)
 	}
@@ -93,7 +93,7 @@ func TestGetTempRef(t *testing.T) {
 		t.Error()
 	}
 
-	ref, err = repository.GetTempRef(commitName)
+	ref, err = testRepository.GetTempRef(commitName)
 	if nil != err {
 		t.Error(err)
 	}
@@ -103,7 +103,7 @@ func TestGetTempRef(t *testing.T) {
 }
 
 func TestGetRefTree(t *testing.T) {
-	ref, err := repository.GetRef(refName)
+	ref, err := testRepository.GetRef(refName)
 	if nil != err {
 		t.Error(err)
 	}
@@ -111,7 +111,7 @@ func TestGetRefTree(t *testing.T) {
 		t.Error()
 	}
 
-	tree, err := repository.GetTree(ref, nil)
+	tree, err := testRepository.GetTree(ref, nil)
 	if nil != err {
 		t.Error(err)
 	}
@@ -126,7 +126,7 @@ func TestGetRefTree(t *testing.T) {
 		t.Error()
 	}
 
-	tree, err = repository.GetTree(ref, nil)
+	tree, err = testRepository.GetTree(ref, nil)
 	if nil != err {
 		t.Error(err)
 	}
@@ -143,7 +143,7 @@ func TestGetRefTree(t *testing.T) {
 }
 
 func TestGetRefTreeEntry(t *testing.T) {
-	ref, err := repository.GetRef(refName)
+	ref, err := testRepository.GetRef(refName)
 	if nil != err {
 		t.Error(err)
 	}
@@ -151,7 +151,7 @@ func TestGetRefTreeEntry(t *testing.T) {
 		t.Error()
 	}
 
-	entry, err := repository.GetTreeEntry(ref, nil, entryName)
+	entry, err := testRepository.GetTreeEntry(ref, nil, entryName)
 	if nil != err {
 		t.Error(err)
 	}
@@ -159,7 +159,7 @@ func TestGetRefTreeEntry(t *testing.T) {
 		t.Error()
 	}
 
-	entry, err = repository.GetTreeEntry(ref, nil, entryName)
+	entry, err = testRepository.GetTreeEntry(ref, nil, entryName)
 	if nil != err {
 		t.Error(err)
 	}
@@ -170,7 +170,7 @@ func TestGetRefTreeEntry(t *testing.T) {
 }
 
 func TestGetTree(t *testing.T) {
-	ref, err := repository.GetRef(refName)
+	ref, err := testRepository.GetRef(refName)
 	if nil != err {
 		t.Error(err)
 	}
@@ -178,7 +178,7 @@ func TestGetTree(t *testing.T) {
 		t.Error()
 	}
 
-	entry, err := repository.GetTreeEntry(ref, nil, subtreeName)
+	entry, err := testRepository.GetTreeEntry(ref, nil, subtreeName)
 	if nil != err {
 		t.Error(err)
 	}
@@ -186,7 +186,7 @@ func TestGetTree(t *testing.T) {
 		t.Error()
 	}
 
-	tree, err := repository.GetTree(nil, entry)
+	tree, err := testRepository.GetTree(nil, entry)
 	if nil != err {
 		t.Error(err)
 	}
@@ -201,7 +201,7 @@ func TestGetTree(t *testing.T) {
 		t.Error()
 	}
 
-	tree, err = repository.GetTree(nil, entry)
+	tree, err = testRepository.GetTree(nil, entry)
 	if nil != err {
 		t.Error(err)
 	}
@@ -218,7 +218,7 @@ func TestGetTree(t *testing.T) {
 }
 
 func TestGetTreeEntry(t *testing.T) {
-	ref, err := repository.GetRef(refName)
+	ref, err := testRepository.GetRef(refName)
 	if nil != err {
 		t.Error(err)
 	}
@@ -226,7 +226,7 @@ func TestGetTreeEntry(t *testing.T) {
 		t.Error()
 	}
 
-	entry, err := repository.GetTreeEntry(ref, nil, subtreeName)
+	entry, err := testRepository.GetTreeEntry(ref, nil, subtreeName)
 	if nil != err {
 		t.Error(err)
 	}
@@ -234,7 +234,7 @@ func TestGetTreeEntry(t *testing.T) {
 		t.Error()
 	}
 
-	subentry, err := repository.GetTreeEntry(nil, entry, subentryName)
+	subentry, err := testRepository.GetTreeEntry(nil, entry, subentryName)
 	if nil != err {
 		t.Error(err)
 	}
@@ -242,7 +242,7 @@ func TestGetTreeEntry(t *testing.T) {
 		t.Error()
 	}
 
-	subentry, err = repository.GetTreeEntry(nil, entry, subentryName)
+	subentry, err = testRepository.GetTreeEntry(nil, entry, subentryName)
 	if nil != err {
 		t.Error(err)
 	}
@@ -252,7 +252,7 @@ func TestGetTreeEntry(t *testing.T) {
 }
 
 func TestGetBlobReader(t *testing.T) {
-	ref, err := repository.GetRef(refName)
+	ref, err := testRepository.GetRef(refName)
 	if nil != err {
 		t.Error(err)
 	}
@@ -260,7 +260,7 @@ func TestGetBlobReader(t *testing.T) {
 		t.Error()
 	}
 
-	entry, err := repository.GetTreeEntry(ref, nil, subtreeName)
+	entry, err := testRepository.GetTreeEntry(ref, nil, subtreeName)
 	if nil != err {
 		t.Error(err)
 	}
@@ -268,7 +268,7 @@ func TestGetBlobReader(t *testing.T) {
 		t.Error()
 	}
 
-	subentry, err := repository.GetTreeEntry(nil, entry, subentryName)
+	subentry, err := testRepository.GetTreeEntry(nil, entry, subentryName)
 	if nil != err {
 		t.Error(err)
 	}
@@ -276,7 +276,7 @@ func TestGetBlobReader(t *testing.T) {
 		t.Error()
 	}
 
-	reader, err := repository.GetBlobReader(subentry)
+	reader, err := testRepository.GetBlobReader(subentry)
 	if nil != err {
 		t.Error(err)
 	}
@@ -286,7 +286,7 @@ func TestGetBlobReader(t *testing.T) {
 		t.Error()
 	}
 
-	reader, err = repository.GetBlobReader(subentry)
+	reader, err = testRepository.GetBlobReader(subentry)
 	if nil != err {
 		t.Error(err)
 	}
@@ -340,7 +340,7 @@ func init() {
 			caseins = true
 		}
 
-		token, err := keyring.Get("hubfs", "https://github.com")
+		token, err := keyring.Get("hubfs", "github.com")
 		if nil != err {
 			token = ""
 		}
@@ -348,7 +348,7 @@ func init() {
 			token = os.Getenv("HUBFS_TOKEN")
 		}
 
-		repository, err = NewGitRepository(remote, token, caseins)
+		testRepository, err = NewGitRepository(remote, token, caseins)
 		if nil != err {
 			return err
 		}
@@ -358,14 +358,14 @@ func init() {
 			return err
 		}
 
-		err = repository.SetDirectory(tdir)
+		err = testRepository.SetDirectory(tdir)
 		if nil != err {
 			return err
 		}
 
 		atexit(func() {
-			repository.RemoveDirectory()
-			repository.Close()
+			testRepository.RemoveDirectory()
+			testRepository.Close()
 		})
 
 		return nil

@@ -69,7 +69,7 @@ func (c *gitlabWebAppFlowHttpClient) PostForm(url string, data url.Values) (*htt
 	return c.Client.PostForm(url, data)
 }
 
-func (provider *GitlabProvider) Auth() (token string, err error) {
+func (p *GitlabProvider) Auth() (token string, err error) {
 	// PKCE (RFC 7636) for GitLab
 	buf := make([]byte, 80)
 	_, err = rand.Read(buf)
@@ -84,13 +84,13 @@ func (provider *GitlabProvider) Auth() (token string, err error) {
 
 	flow := &oauth.Flow{
 		Host: &oauth.Host{
-			AuthorizeURL: fmt.Sprintf("https://%s/oauth/authorize", provider.Hostname),
-			TokenURL:     fmt.Sprintf("https://%s/oauth/token", provider.Hostname),
+			AuthorizeURL: fmt.Sprintf("https://%s/oauth/authorize", p.Hostname),
+			TokenURL:     fmt.Sprintf("https://%s/oauth/token", p.Hostname),
 		},
-		ClientID:     provider.ClientId,
-		ClientSecret: provider.ClientSecret,
-		CallbackURI:  provider.CallbackURI,
-		Scopes:       strings.Split(provider.Scopes, ","),
+		ClientID:     p.ClientId,
+		ClientSecret: p.ClientSecret,
+		CallbackURI:  p.CallbackURI,
+		Scopes:       strings.Split(p.Scopes, ","),
 		BrowseURL: func(uri string) error {
 			return browser.OpenURL(
 				fmt.Sprintf("%s&response_type=code&code_challenge=%s&code_challenge_method=S256",
@@ -98,7 +98,7 @@ func (provider *GitlabProvider) Auth() (token string, err error) {
 		},
 		HTTPClient: &gitlabWebAppFlowHttpClient{
 			Client:        httputil.DefaultClient,
-			callbackURI:   provider.CallbackURI,
+			callbackURI:   p.CallbackURI,
 			code_verifier: code_verifier,
 		},
 	}
@@ -109,6 +109,6 @@ func (provider *GitlabProvider) Auth() (token string, err error) {
 	return
 }
 
-func (provider *GitlabProvider) NewClient(token string) (Client, error) {
+func (p *GitlabProvider) NewClient(token string) (Client, error) {
 	return nil, fmt.Errorf("unimplemented")
 }

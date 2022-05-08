@@ -155,7 +155,7 @@ func TestMain(m *testing.M) {
 	libtrace.Pattern = "github.com/winfsp/hubfs/*"
 
 	var err error
-	token, err = keyring.Get("hubfs", "https://github.com")
+	token, err = keyring.Get("hubfs", "github.com")
 	if nil != err {
 		token = ""
 	}

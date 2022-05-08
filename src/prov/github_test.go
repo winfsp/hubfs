@@ -25,39 +25,39 @@ import (
 const ownerName = "winfsp"
 const repositoryName = "hubfs"
 
-var client Client
+var testClient Client
 
 func TestOpenCloseOwner(t *testing.T) {
-	owner, err := client.OpenOwner(ownerName)
+	owner, err := testClient.OpenOwner(ownerName)
 	if nil != err {
 		t.Error(err)
 	}
 	if owner.Name() != ownerName {
 		t.Error()
 	}
-	client.CloseOwner(owner)
+	testClient.CloseOwner(owner)
 
-	owner, err = client.OpenOwner(ownerName)
+	owner, err = testClient.OpenOwner(ownerName)
 	if nil != err {
 		t.Error(err)
 	}
 	if owner.Name() != ownerName {
 		t.Error()
 	}
-	client.CloseOwner(owner)
+	testClient.CloseOwner(owner)
 }
 
 func TestGetRepositories(t *testing.T) {
-	owner, err := client.OpenOwner(ownerName)
+	owner, err := testClient.OpenOwner(ownerName)
 	if nil != err {
 		t.Error(err)
 	}
-	defer client.CloseOwner(owner)
+	defer testClient.CloseOwner(owner)
 	if owner.Name() != ownerName {
 		t.Error()
 	}
 
-	repositories, err := client.GetRepositories(owner)
+	repositories, err := testClient.GetRepositories(owner)
 	if nil != err {
 		t.Error(err)
 	}
@@ -72,7 +72,7 @@ func TestGetRepositories(t *testing.T) {
 		t.Error()
 	}
 
-	repositories, err = client.GetRepositories(owner)
+	repositories, err = testClient.GetRepositories(owner)
 	if nil != err {
 		t.Error(err)
 	}
@@ -89,39 +89,39 @@ func TestGetRepositories(t *testing.T) {
 }
 
 func TestOpenCloseRepository(t *testing.T) {
-	owner, err := client.OpenOwner(ownerName)
+	owner, err := testClient.OpenOwner(ownerName)
 	if nil != err {
 		t.Error(err)
 	}
-	defer client.CloseOwner(owner)
+	defer testClient.CloseOwner(owner)
 	if owner.Name() != ownerName {
 		t.Error()
 	}
 
-	repository, err := client.OpenRepository(owner, repositoryName)
+	repository, err := testClient.OpenRepository(owner, repositoryName)
 	if nil != err {
 		t.Error(err)
 	}
 	if repository.Name() != repositoryName {
 		t.Error()
 	}
-	client.CloseRepository(repository)
+	testClient.CloseRepository(repository)
 
-	repository, err = client.OpenRepository(owner, repositoryName)
+	repository, err = testClient.OpenRepository(owner, repositoryName)
 	if nil != err {
 		t.Error(err)
 	}
 	if repository.Name() != repositoryName {
 		t.Error()
 	}
-	client.CloseRepository(repository)
+	testClient.CloseRepository(repository)
 }
 
 func testExpiration(t *testing.T) {
-	client.StartExpiration()
-	defer client.StopExpiration()
+	testClient.StartExpiration()
+	defer testClient.StopExpiration()
 
-	owner, err := client.OpenOwner(ownerName)
+	owner, err := testClient.OpenOwner(ownerName)
 	if nil != err {
 		t.Error(err)
 	}
@@ -129,7 +129,7 @@ func testExpiration(t *testing.T) {
 		t.Error()
 	}
 
-	repository, err := client.OpenRepository(owner, repositoryName)
+	repository, err := testClient.OpenRepository(owner, repositoryName)
 	if nil != err {
 		t.Error(err)
 	}
@@ -137,12 +137,12 @@ func testExpiration(t *testing.T) {
 		t.Error()
 	}
 
-	client.CloseRepository(repository)
-	client.CloseOwner(owner)
+	testClient.CloseRepository(repository)
+	testClient.CloseOwner(owner)
 
 	time.Sleep(3 * time.Second)
 
-	owner, err = client.OpenOwner(ownerName)
+	owner, err = testClient.OpenOwner(ownerName)
 	if nil != err {
 		t.Error(err)
 	}
@@ -150,7 +150,7 @@ func testExpiration(t *testing.T) {
 		t.Error()
 	}
 
-	repository, err = client.OpenRepository(owner, repositoryName)
+	repository, err = testClient.OpenRepository(owner, repositoryName)
 	if nil != err {
 		t.Error(err)
 	}
@@ -158,8 +158,8 @@ func testExpiration(t *testing.T) {
 		t.Error()
 	}
 
-	client.CloseRepository(repository)
-	client.CloseOwner(owner)
+	testClient.CloseRepository(repository)
+	testClient.CloseOwner(owner)
 }
 
 func TestExpiration(t *testing.T) {
@@ -169,7 +169,7 @@ func TestExpiration(t *testing.T) {
 
 func init() {
 	atinit(func() error {
-		token, err := keyring.Get("hubfs", "https://github.com")
+		token, err := keyring.Get("hubfs", "github.com")
 		if nil != err {
 			token = ""
 		}
@@ -178,12 +178,12 @@ func init() {
 		}
 
 		uri, _ := url.Parse("https://github.com")
-		client, err = NewProviderInstance(uri).NewClient(token)
+		testClient, err = NewProviderInstance(uri).NewClient(token)
 		if nil != err {
 			return err
 		}
 
-		client.SetConfig([]string{"config.ttl=1s"})
+		testClient.SetConfig([]string{"config.ttl=1s"})
 
 		return nil
 	})
