@@ -26,6 +26,7 @@ import (
 
 const remote = "https://github.com/winfsp/hubfs"
 const refName = "master"
+const tagName = "v1.0B1"
 const entryName = "README.md"
 const subtreeName = "src"
 const subentryName = "go.mod"
@@ -102,12 +103,12 @@ func TestGetTempRef(t *testing.T) {
 	}
 }
 
-func TestGetRefTree(t *testing.T) {
-	ref, err := testRepository.GetRef(refName)
+func testGetRefTree(t *testing.T, name string) {
+	ref, err := testRepository.GetRef(name)
 	if nil != err {
 		t.Error(err)
 	}
-	if ref.Name() != refName {
+	if ref.Name() != name {
 		t.Error()
 	}
 
@@ -142,12 +143,17 @@ func TestGetRefTree(t *testing.T) {
 	}
 }
 
-func TestGetRefTreeEntry(t *testing.T) {
-	ref, err := testRepository.GetRef(refName)
+func TestGetRefTree(t *testing.T) {
+	testGetRefTree(t, refName)
+	testGetRefTree(t, tagName)
+}
+
+func testGetRefTreeEntry(t *testing.T, name string) {
+	ref, err := testRepository.GetRef(name)
 	if nil != err {
 		t.Error(err)
 	}
-	if ref.Name() != refName {
+	if ref.Name() != name {
 		t.Error()
 	}
 
@@ -169,12 +175,17 @@ func TestGetRefTreeEntry(t *testing.T) {
 
 }
 
-func TestGetTree(t *testing.T) {
-	ref, err := testRepository.GetRef(refName)
+func TestGetRefTreeEntry(t *testing.T) {
+	testGetRefTreeEntry(t, refName)
+	testGetRefTreeEntry(t, tagName)
+}
+
+func testGetTree(t *testing.T, name string) {
+	ref, err := testRepository.GetRef(name)
 	if nil != err {
 		t.Error(err)
 	}
-	if ref.Name() != refName {
+	if ref.Name() != name {
 		t.Error()
 	}
 
@@ -217,12 +228,17 @@ func TestGetTree(t *testing.T) {
 	}
 }
 
-func TestGetTreeEntry(t *testing.T) {
-	ref, err := testRepository.GetRef(refName)
+func TestGetTree(t *testing.T) {
+	testGetTree(t, refName)
+	testGetTree(t, tagName)
+}
+
+func testGetTreeEntry(t *testing.T, name string) {
+	ref, err := testRepository.GetRef(name)
 	if nil != err {
 		t.Error(err)
 	}
-	if ref.Name() != refName {
+	if ref.Name() != name {
 		t.Error()
 	}
 
@@ -249,6 +265,11 @@ func TestGetTreeEntry(t *testing.T) {
 	if subentry.Name() != subentryName {
 		t.Error()
 	}
+}
+
+func TestGetTreeEntry(t *testing.T) {
+	testGetTreeEntry(t, refName)
+	testGetTreeEntry(t, tagName)
 }
 
 func TestGetBlobReader(t *testing.T) {

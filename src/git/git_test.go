@@ -26,6 +26,7 @@ const refName = "refs/heads/master"
 
 const hash0 = "90f898ae1f8d3c976f9224d92e3b08d7813e961e"
 const hash1 = "609d3b892764952ef69676e653e06b2ca904be18"
+const hash2 = "9b3aeb6b08911ee09ecc31c8c87e4905cf8b4dac"
 
 var token string
 
@@ -77,9 +78,11 @@ func TestFetchObjects(t *testing.T) {
 	wants := []string{
 		hash0,
 		hash1,
+		hash2,
 	}
 	found0 := false
 	found1 := false
+	found2 := false
 	err = repository.FetchObjects(wants,
 		func(hash string, ot ObjectType, content []byte) error {
 			if hash0 == hash {
@@ -96,12 +99,19 @@ func TestFetchObjects(t *testing.T) {
 					return err
 				}
 			}
+			if hash2 == hash {
+				found2 = true
+				_, err := DecodeTag(content)
+				if nil != err {
+					return err
+				}
+			}
 			return nil
 		})
 	if nil != err {
 		t.Error(err)
 	}
-	if !found0 || !found1 {
+	if !found0 || !found1 || !found2 {
 		t.Error()
 	}
 

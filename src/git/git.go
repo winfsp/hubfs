@@ -50,6 +50,11 @@ type Signature struct {
 	Time  time.Time
 }
 
+type Tag struct {
+	Tagger     Signature
+	TargetHash string
+}
+
 type Commit struct {
 	Author    Signature
 	Committer Signature
@@ -251,6 +256,30 @@ func (repository *Repository) FetchObjects(wants []string,
 	}
 
 	return nil
+}
+
+func DecodeTag(content []byte) (res *Tag, err error) {
+	obj := &plumbing.MemoryObject{}
+	obj.SetType(plumbing.TagObject)
+	obj.Write(content)
+	t := &object.Tag{}
+	err = t.Decode(obj)
+	if nil != err {
+		return
+	}
+	if plumbing.CommitObject != t.TargetType {
+		err = plumbing.ErrInvalidType
+		return
+	}
+	res = &Tag{
+		Tagger: Signature{
+			Name:  t.Tagger.Name,
+			Email: t.Tagger.Email,
+			Time:  t.Tagger.When,
+		},
+		TargetHash: t.Target.String(),
+	}
+	return
 }
 
 func DecodeCommit(content []byte) (res *Commit, err error) {

@@ -44,7 +44,7 @@ type gitRepository struct {
 type gitRef struct {
 	name       string
 	kind       RefKind
-	commitHash string
+	targetHash string
 	tree       map[string]*gitTreeEntry
 	treeTime   time.Time
 	modules    map[string]string
@@ -386,7 +386,7 @@ func (r *gitRepository) ensureRefs(fn func(refs map[string]*gitRef) error) error
 		refs[k] = &gitRef{
 			name:       n,
 			kind:       kind,
-			commitHash: h,
+			targetHash: h,
 		}
 	}
 
@@ -469,7 +469,7 @@ func (r *gitRepository) GetTempRef(name string) (res Ref, err error) {
 	ref := &gitRef{
 		name:       strings.ToLower(name),
 		kind:       RefTemp,
-		commitHash: name,
+		targetHash: name,
 	}
 	r.lock.Lock()
 	r.refs[k] = ref
@@ -511,15 +511,30 @@ func (r *gitRepository) ensureTree(
 	var treeTime time.Time
 	want := []string{""}
 	if nil == entry {
-		err := r.fetchObjects(dir, []string{ref.commitHash}, func(hash string, content []byte) error {
+		h := ""
+		f := func(hash string, content []byte) error {
 			c, err := git.DecodeCommit(content)
 			if nil != err {
-				return nil
+				return err
 			}
 			treeTime = c.Committer.Time
 			want[0] = c.TreeHash
 			return nil
+		}
+		err := r.fetchObjects(dir, []string{ref.targetHash}, func(hash string, content []byte) error {
+			if bytes.HasPrefix(content, []byte("object ")) {
+				t, err := git.DecodeTag(content)
+				if nil != err {
+					return err
+				}
+				h = t.TargetHash
+				return nil
+			}
+			return f(hash, content)
 		})
+		if nil == err && "" != h {
+			err = r.fetchObjects(dir, []string{h}, f)
+		}
 		if nil != err {
 			return err
 		}
@@ -531,7 +546,7 @@ func (r *gitRepository) ensureTree(
 	err := r.fetchObjects(dir, want, func(hash string, content []byte) error {
 		t, err := git.DecodeTree(content)
 		if nil != err {
-			return nil
+			return err
 		}
 		for _, e := range t {
 			k := e.Name
