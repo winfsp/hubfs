@@ -31,14 +31,15 @@ import (
 )
 
 type gitRepository struct {
-	remote  string
-	token   string
-	caseins bool
-	once    sync.Once
-	repo    *git.Repository
-	lock    sync.RWMutex
-	refs    map[string]*gitRef
-	dir     string
+	remote   string
+	token    string
+	caseins  bool
+	fullrefs bool
+	once     sync.Once
+	repo     *git.Repository
+	lock     sync.RWMutex
+	refs     map[string]*gitRef
+	dir      string
 }
 
 type gitRef struct {
@@ -73,11 +74,12 @@ func NewGitRepository(remote string, token string, caseins bool) (Repository, er
 	return r, nil
 }
 
-func newGitRepository(remote string, token string, caseins bool) Repository {
+func newGitRepository(remote string, token string, caseins bool, fullrefs bool) Repository {
 	return &gitRepository{
-		remote:  remote,
-		token:   token,
-		caseins: caseins,
+		remote:   remote,
+		token:    token,
+		caseins:  caseins,
+		fullrefs: fullrefs,
 	}
 }
 
@@ -364,13 +366,19 @@ func (r *gitRepository) ensureRefs(fn func(refs map[string]*gitRef) error) error
 	for n, h := range m {
 		kind := RefOther
 		if strings.HasPrefix(n, "refs/heads/") {
-			n = n[len("refs/heads/"):]
+			if !r.fullrefs {
+				n = n[len("refs/heads/"):]
+			}
 			kind = RefBranch
 		} else if strings.HasPrefix(n, "refs/tags/") {
-			n = n[len("refs/tags/"):]
+			if !r.fullrefs {
+				n = n[len("refs/tags/"):]
+			}
 			kind = RefTag
 		} else {
-			continue
+			if !r.fullrefs {
+				continue
+			}
 		}
 		n = strings.ReplaceAll(n, "/", string(AltPathSeparator))
 
@@ -401,11 +409,18 @@ func (r *gitRepository) ensureRefs(fn func(refs map[string]*gitRef) error) error
 
 func (r *gitRepository) GetRefs() (res []Ref, err error) {
 	err = r.ensureRefs(func(refs map[string]*gitRef) error {
-		res = make([]Ref, len(refs))
-		i := 0
-		for _, e := range refs {
-			res[i] = e
-			i++
+		res = make([]Ref, 0, len(refs))
+		if r.fullrefs {
+			for _, e := range refs {
+				res = append(res, e)
+			}
+		} else {
+			for _, e := range refs {
+				if RefBranch != e.kind {
+					continue
+				}
+				res = append(res, e)
+			}
 		}
 		return nil
 	})

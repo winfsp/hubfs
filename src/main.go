@@ -160,6 +160,7 @@ func run() int {
 	authkey := ""
 	authonly := false
 	readonly := false
+	fullrefs := false
 	filter := optlist{}
 	mntopt := optlist{}
 	remote := "github.com"
@@ -190,6 +191,7 @@ func run() int {
 	flag.StringVar(&authkey, "authkey", authkey, "`name` of key that stores auth token in system keyring")
 	flag.BoolVar(&authonly, "authonly", authonly, "perform auth only; do not mount")
 	flag.BoolVar(&readonly, "readonly", readonly, "read only file system")
+	flag.BoolVar(&fullrefs, "fullrefs", fullrefs, "full format refs (refs+heads+master instead of master)")
 	flag.Var(&filter, "filter",
 		"list of `rules` that determine repo availability\n"+
 			"- list form: rule1,rule2,...\n"+
@@ -326,6 +328,10 @@ func run() int {
 				}
 				config = append(config, s)
 			}
+		}
+
+		if fullrefs {
+			config = append(config, "config._fullrefs=1")
 		}
 
 		for _, f := range filter {

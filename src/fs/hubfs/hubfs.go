@@ -268,9 +268,6 @@ func (fs *hubfs) Readdir(path string,
 	} else if nil != obs.repository {
 		if lst, err := obs.repository.GetRefs(); nil == err {
 			for _, elm := range lst {
-				if prov.RefBranch != elm.Kind() {
-					continue
-				}
 				if !fill(elm.Name(), &stat, 0) {
 					break
 				}

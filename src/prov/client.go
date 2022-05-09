@@ -28,6 +28,7 @@ type client struct {
 	dir      string
 	keepdir  bool
 	caseins  bool
+	fullrefs bool
 	ttl      time.Duration
 	lock     sync.Mutex
 	cache    *cache
@@ -99,6 +100,12 @@ func (c *client) SetConfig(config []string) ([]string, error) {
 				c.caseins = true
 			} else {
 				c.caseins = false
+			}
+		case configValue(s, "config._fullrefs=", &v):
+			if "1" == v {
+				c.fullrefs = true
+			} else {
+				c.fullrefs = false
 			}
 		case configValue(s, "config._filter=", &v):
 			if nil == c.filter {
@@ -230,7 +237,7 @@ func (c *client) OpenRepository(O Owner, name string) (Repository, error) {
 		}
 		res = item.Value.(*repository)
 		if emptyRepository == res.Repository {
-			r := newGitRepository(res.FRemote, c.internal.getToken(), c.caseins)
+			r := newGitRepository(res.FRemote, c.internal.getToken(), c.caseins, c.fullrefs)
 			if "" != c.dir {
 				err = r.SetDirectory(filepath.Join(c.dir, o.FName, res.FName))
 				if nil != err {
