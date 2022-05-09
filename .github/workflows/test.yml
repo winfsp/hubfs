@@ -215,6 +215,8 @@ jobs:
           Start-Sleep 3
           Push-Location X:\winfsp\hubfs\master
           build/make dist
+          cd X:\winfsp\hubfs\TestTag
+          build/make dist
           Stop-Process -Name hubfs
           Start-Sleep 3
           Pop-Location
@@ -231,6 +233,7 @@ jobs:
           ./build/out/hubfs -auth token=$HUBFS_TOKEN github.com mnt &
           sleep 3
           (cd mnt/winfsp/hubfs/master && build/make dist)
+          (cd mnt/winfsp/hubfs/TestTag && build/make dist)
           sudo umount mnt
 
           rmdir mnt
