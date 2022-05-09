@@ -52,8 +52,6 @@ type Config struct {
 	Overlay bool
 }
 
-const refSlashSeparator = "+"
-
 func new(c Config) fuse.FileSystemInterface {
 	return &hubfs{
 		client:  c.Client,
@@ -92,25 +90,12 @@ func (fs *hubfs) openex(path string, norm bool) (errc int, res *obstack, lst []s
 				lst[i] = obs.repository.Name()
 			}
 		case 2:
-			c = strings.ReplaceAll(c, refSlashSeparator, "/")
-			obs.ref, err = obs.repository.GetRef("refs/heads/" + c)
+			obs.ref, err = obs.repository.GetRef(c)
 			if prov.ErrNotFound == err {
-				obs.ref, err = obs.repository.GetRef("refs/tags/" + c)
-				if prov.ErrNotFound == err {
-					obs.ref, err = obs.repository.GetTempRef(c)
-				}
+				obs.ref, err = obs.repository.GetTempRef(c)
 			}
 			if norm && nil == err {
-				r := obs.ref.Name()
-				n := strings.TrimPrefix(r, "refs/heads/")
-				if r == n {
-					n = strings.TrimPrefix(r, "refs/tags/")
-					if r == n {
-						n = r
-					}
-				}
-				n = strings.ReplaceAll(n, "/", refSlashSeparator)
-				lst[i] = n
+				lst[i] = obs.ref.Name()
 			}
 		default:
 			obs.entry, err = obs.repository.GetTreeEntry(obs.ref, obs.entry, c)
@@ -283,13 +268,10 @@ func (fs *hubfs) Readdir(path string,
 	} else if nil != obs.repository {
 		if lst, err := obs.repository.GetRefs(); nil == err {
 			for _, elm := range lst {
-				r := elm.Name()
-				n := strings.TrimPrefix(r, "refs/heads/")
-				if r == n {
+				if prov.RefBranch != elm.Kind() {
 					continue
 				}
-				n = strings.ReplaceAll(n, "/", refSlashSeparator)
-				if !fill(n, &stat, 0) {
+				if !fill(elm.Name(), &stat, 0) {
 					break
 				}
 			}

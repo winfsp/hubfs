@@ -63,6 +63,7 @@ type Repository interface {
 
 type Ref interface {
 	Name() string
+	Kind() RefKind
 	TreeTime() time.Time
 }
 
@@ -73,6 +74,17 @@ type TreeEntry interface {
 	Target() string
 	Hash() string
 }
+
+type RefKind int
+
+const (
+	RefTemp RefKind = iota
+	RefBranch
+	RefTag
+	RefOther
+)
+
+const AltPathSeparator = '+'
 
 var ErrNotFound = errors.New("not found")
 

@@ -43,6 +43,7 @@ type gitRepository struct {
 
 type gitRef struct {
 	name       string
+	kind       RefKind
 	commitHash string
 	tree       map[string]*gitTreeEntry
 	treeTime   time.Time
@@ -359,15 +360,32 @@ func (r *gitRepository) ensureRefs(fn func(refs map[string]*gitRef) error) error
 		return err
 	}
 
-	refs := make(map[string]*gitRef, len(m))
+	refs := make(map[string]*gitRef)
 	for n, h := range m {
+		kind := RefOther
+		if strings.HasPrefix(n, "refs/heads/") {
+			n = n[len("refs/heads/"):]
+			kind = RefBranch
+		} else if strings.HasPrefix(n, "refs/tags/") {
+			n = n[len("refs/tags/"):]
+			kind = RefTag
+		} else {
+			continue
+		}
+		n = strings.ReplaceAll(n, "/", string(AltPathSeparator))
+
 		k := n
 		if r.caseins {
 			k = strings.ToUpper(k)
 		}
 
+		if ref := refs[k]; nil != ref && kind >= ref.kind {
+			continue
+		}
+
 		refs[k] = &gitRef{
 			name:       n,
+			kind:       kind,
 			commitHash: h,
 		}
 	}
@@ -449,7 +467,8 @@ func (r *gitRepository) GetTempRef(name string) (res Ref, err error) {
 	}
 
 	ref := &gitRef{
-		name:       name,
+		name:       strings.ToLower(name),
+		kind:       RefTemp,
 		commitHash: name,
 	}
 	r.lock.Lock()
@@ -723,6 +742,10 @@ func (r *gitRepository) GetModule(ref Ref, path string, rootrel bool) (res strin
 
 func (r *gitRef) Name() string {
 	return r.name
+}
+
+func (r *gitRef) Kind() RefKind {
+	return r.kind
 }
 
 func (r *gitRef) TreeTime() time.Time {

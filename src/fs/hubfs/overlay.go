@@ -95,16 +95,6 @@ func newOverlay(c Config) fuse.FileSystemInterface {
 			return nil
 		}
 
-		r := obs.ref.Name()
-		n := strings.TrimPrefix(r, "refs/heads/")
-		if r == n {
-			n = strings.TrimPrefix(r, "refs/tags/")
-			if r == n {
-				n = r
-			}
-		}
-		n = strings.ReplaceAll(n, "/", refSlashSeparator)
-
 		root := filepath.Join(obs.repository.GetDirectory(), "files")
 		err := os.MkdirAll(root, 0700)
 		if nil != err {
@@ -112,7 +102,7 @@ func newOverlay(c Config) fuse.FileSystemInterface {
 			return nil
 		}
 
-		root = filepath.Join(root, n)
+		root = filepath.Join(root, obs.ref.Name())
 		err = os.MkdirAll(root, 0755)
 		if nil != err {
 			topfs.release(obs)

@@ -25,7 +25,7 @@ import (
 )
 
 const remote = "https://github.com/winfsp/hubfs"
-const refName = "refs/heads/master"
+const refName = "master"
 const entryName = "README.md"
 const subtreeName = "src"
 const subentryName = "go.mod"
@@ -299,7 +299,7 @@ func TestGetBlobReader(t *testing.T) {
 
 func TestGetModule(t *testing.T) {
 	const remote = "https://github.com/winfsp/winfsp"
-	const refName = "refs/heads/master"
+	const refName = "master"
 	const modulePath = "ext/test"
 	const moduleTarget = "/billziss-gh/secfs.test"
 
