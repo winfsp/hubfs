@@ -32,7 +32,8 @@ import (
 
 type gitRepository struct {
 	remote   string
-	token    string
+	username string
+	password string
 	caseins  bool
 	fullrefs bool
 	once     sync.Once
@@ -58,11 +59,13 @@ type gitTreeEntry struct {
 	tree   map[string]*gitTreeEntry
 }
 
-func NewGitRepository(remote string, token string, caseins bool) (Repository, error) {
+func NewGitRepository(
+	remote string, username string, password string, caseins bool, fullrefs bool) (Repository, error) {
 	r := &gitRepository{
-		remote:  remote,
-		token:   token,
-		caseins: caseins,
+		remote:   remote,
+		username: username,
+		password: password,
+		caseins:  caseins,
 	}
 
 	var err error
@@ -74,17 +77,19 @@ func NewGitRepository(remote string, token string, caseins bool) (Repository, er
 	return r, nil
 }
 
-func newGitRepository(remote string, token string, caseins bool, fullrefs bool) Repository {
+func newGitRepository(
+	remote string, username string, password string, caseins bool, fullrefs bool) Repository {
 	return &gitRepository{
 		remote:   remote,
-		token:    token,
+		username: username,
+		password: password,
 		caseins:  caseins,
 		fullrefs: fullrefs,
 	}
 }
 
 func (r *gitRepository) open() (err error) {
-	r.repo, err = git.OpenRepository(r.remote, r.token)
+	r.repo, err = git.OpenRepository(r.remote, r.username, r.password)
 	return
 }
 

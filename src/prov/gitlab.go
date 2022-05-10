@@ -17,6 +17,8 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -110,5 +112,168 @@ func (p *GitlabProvider) Auth() (token string, err error) {
 }
 
 func (p *GitlabProvider) NewClient(token string) (Client, error) {
-	return nil, fmt.Errorf("unimplemented")
+	return NewGitlabClient(p.ApiURI, token)
+}
+
+type gitlabClient struct {
+	client
+	httpClient *http.Client
+	ident      string
+	apiURI     string
+	token      string
+	login      string
+}
+
+func NewGitlabClient(apiURI string, token string) (Client, error) {
+	uri, err := url.Parse(apiURI)
+	if nil != err {
+		return nil, err
+	}
+
+	c := &gitlabClient{
+		httpClient: httputil.DefaultClient,
+		ident:      uri.Hostname(),
+		apiURI:     apiURI,
+		token:      token,
+	}
+	c.client.init(c)
+
+	if "" != c.token {
+		rsp, err := c.sendrecv("/user")
+		if nil != err {
+			return nil, err
+		}
+		defer rsp.Body.Close()
+
+		var content struct {
+			Login string `json:"username"`
+		}
+		err = json.NewDecoder(rsp.Body).Decode(&content)
+		if nil != err {
+			return nil, err
+		}
+
+		c.login = content.Login
+	}
+
+	return c, nil
+}
+
+func (c *gitlabClient) getIdent() string {
+	return c.ident
+}
+
+func (c *gitlabClient) getGitCredentials() (string, string) {
+	return "oauth2", c.token
+}
+
+func (c *gitlabClient) sendrecv(path string) (*http.Response, error) {
+	req, err := http.NewRequest("GET", c.apiURI+path, nil)
+	if nil != err {
+		return nil, err
+	}
+
+	if "" != c.token {
+		req.Header.Set("Authorization", "Bearer "+c.token)
+	}
+
+	rsp, err := c.httpClient.Do(req)
+	if nil != err {
+		return nil, err
+	}
+
+	if 404 == rsp.StatusCode {
+		return nil, ErrNotFound
+	} else if 400 <= rsp.StatusCode {
+		return nil, errors.New(fmt.Sprintf("HTTP %d", rsp.StatusCode))
+	}
+
+	return rsp, nil
+}
+
+func (c *gitlabClient) getOwner(o string) (res *owner, err error) {
+	defer trace(o)(&err)
+
+	rsp, err := c.sendrecv(fmt.Sprintf("/namespaces/%s", o))
+	if nil != err {
+		return nil, err
+	}
+	defer rsp.Body.Close()
+
+	var content struct {
+		FName string `json:"full_path"`
+		FKind string `json:"kind"`
+	}
+	err = json.NewDecoder(rsp.Body).Decode(&content)
+	if nil != err {
+		return nil, err
+	}
+
+	res = &owner{
+		FName: content.FName,
+		FKind: content.FKind,
+	}
+	res.Value = res
+	return
+}
+
+func (c *gitlabClient) getRepositoryPage(prefix string, path string) ([]*repository, error) {
+	rsp, err := c.sendrecv(path)
+	if nil != err {
+		return nil, err
+	}
+	defer rsp.Body.Close()
+
+	var content []struct {
+		FName   string `json:"path_with_namespace"`
+		FRemote string `json:"http_url_to_repo"`
+	}
+	err = json.NewDecoder(rsp.Body).Decode(&content)
+	if nil != err {
+		return nil, err
+	}
+
+	res := make([]*repository, len(content))
+	for i, elm := range content {
+		n := elm.FName
+		n = strings.TrimPrefix(n, prefix)
+		n = strings.ReplaceAll(n, "/", string(AltPathSeparator))
+		r := &repository{
+			FName:   n,
+			FRemote: elm.FRemote,
+		}
+		r.Value = r
+		r.Repository = emptyRepository
+		r.keepdir = c.keepdir
+		res[i] = r
+	}
+
+	return res, nil
+}
+
+func (c *gitlabClient) getRepositories(owner string, kind string) (res []*repository, err error) {
+	defer trace(owner)(&err)
+
+	var path string
+	if "group" == kind {
+		path = fmt.Sprintf("/groups/%s/projects?"+
+			"include_subgroups=true&simple=true&order_by=id&per_page=100", owner)
+	} else {
+		path = fmt.Sprintf("/users/%s/projects?"+
+			"simple=true&order_by=id&per_page=100", owner)
+	}
+
+	res = make([]*repository, 0)
+	for page := 1; ; page++ {
+		lst, err := c.getRepositoryPage(owner+"/", path+fmt.Sprintf("&page=%d", page))
+		if nil != err {
+			return nil, err
+		}
+		res = append(res, lst...)
+		if len(lst) < 100 {
+			break
+		}
+	}
+
+	return res, nil
 }

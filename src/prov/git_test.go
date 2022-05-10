@@ -324,7 +324,7 @@ func TestGetModule(t *testing.T) {
 	const modulePath = "ext/test"
 	const moduleTarget = "/billziss-gh/secfs.test"
 
-	repository, err := NewGitRepository(remote, "", caseins)
+	repository, err := NewGitRepository(remote, "", "", caseins, false)
 	if nil != err {
 		t.Error(err)
 	}
@@ -369,7 +369,7 @@ func init() {
 			token = os.Getenv("HUBFS_TOKEN")
 		}
 
-		testRepository, err = NewGitRepository(remote, token, caseins)
+		testRepository, err = NewGitRepository(remote, token, "x-oauth-basic", caseins, false)
 		if nil != err {
 			return err
 		}

@@ -31,7 +31,7 @@ const hash2 = "9b3aeb6b08911ee09ecc31c8c87e4905cf8b4dac"
 var token string
 
 func TestGetRefs(t *testing.T) {
-	repository, err := OpenRepository(remote, token)
+	repository, err := OpenRepository(remote, token, "x-oauth-basic")
 	if nil != err {
 		t.Error(err)
 	}
@@ -69,7 +69,7 @@ func TestGetRefs(t *testing.T) {
 }
 
 func TestFetchObjects(t *testing.T) {
-	repository, err := OpenRepository(remote, token)
+	repository, err := OpenRepository(remote, token, "x-oauth-basic")
 	if nil != err {
 		t.Error(err)
 	}

@@ -53,7 +53,7 @@ type repository struct {
 
 type clientInternal interface {
 	getIdent() string
-	getToken() string
+	getGitCredentials() (string, string)
 	getOwner(owner string) (res *owner, err error)
 	getRepositories(owner string, kind string) (res []*repository, err error)
 }
@@ -237,7 +237,8 @@ func (c *client) OpenRepository(O Owner, name string) (Repository, error) {
 		}
 		res = item.Value.(*repository)
 		if emptyRepository == res.Repository {
-			r := newGitRepository(res.FRemote, c.internal.getToken(), c.caseins, c.fullrefs)
+			u, p := c.internal.getGitCredentials()
+			r := newGitRepository(res.FRemote, u, p, c.caseins, c.fullrefs)
 			if "" != c.dir {
 				err = r.SetDirectory(filepath.Join(c.dir, o.FName, res.FName))
 				if nil != err {

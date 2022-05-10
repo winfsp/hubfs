@@ -129,8 +129,8 @@ func (c *githubClient) getIdent() string {
 	return c.ident
 }
 
-func (c *githubClient) getToken() string {
-	return c.token
+func (c *githubClient) getGitCredentials() (string, string) {
+	return c.token, "x-oauth-basic"
 }
 
 func (c *githubClient) sendrecv(path string) (*http.Response, error) {

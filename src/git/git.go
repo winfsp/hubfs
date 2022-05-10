@@ -67,17 +67,17 @@ type TreeEntry struct {
 	Hash string
 }
 
-func OpenRepository(remote string, token string) (res *Repository, err error) {
+func OpenRepository(remote string, username string, password string) (res *Repository, err error) {
 	endpoint, err := transport.NewEndpoint(remote)
 	if nil != err {
 		return nil, err
 	}
 
 	var auth transport.AuthMethod
-	if "" != token {
+	if "" != username || "" != password {
 		auth = &http.BasicAuth{
-			Username: token,
-			Password: "x-oauth-basic",
+			Username: username,
+			Password: password,
 		}
 	}
 

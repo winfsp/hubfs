@@ -48,7 +48,7 @@ func main() {
 		wants = os.Args[2:]
 	}
 
-	repository, err := git.OpenRepository(remote, "")
+	repository, err := git.OpenRepository(remote, "", "")
 	if nil != err {
 		fail("repository error: %v", err)
 	}
