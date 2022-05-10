@@ -191,18 +191,45 @@ func (c *gitlabClient) sendrecv(path string) (*http.Response, error) {
 	return rsp, nil
 }
 
-func (c *gitlabClient) getOwner(o string) (res *owner, err error) {
+func (c *gitlabClient) getUser(o string) (res *owner, err error) {
 	defer trace(o)(&err)
 
-	rsp, err := c.sendrecv(fmt.Sprintf("/namespaces/%s", o))
+	rsp, err := c.sendrecv(fmt.Sprintf("/users?username=%s", o))
+	if nil != err {
+		return nil, err
+	}
+	defer rsp.Body.Close()
+
+	var content []struct {
+		FName string `json:"username"`
+	}
+	err = json.NewDecoder(rsp.Body).Decode(&content)
+	if nil != err {
+		return nil, err
+	}
+	if 0 == len(content) {
+		return nil, ErrNotFound
+	}
+
+	res = &owner{
+		FName: content[0].FName,
+		FKind: "user",
+	}
+	res.Value = res
+	return
+}
+
+func (c *gitlabClient) getGroup(o string) (res *owner, err error) {
+	defer trace(o)(&err)
+
+	rsp, err := c.sendrecv(fmt.Sprintf("/groups/%s?with_projects=false", o))
 	if nil != err {
 		return nil, err
 	}
 	defer rsp.Body.Close()
 
 	var content struct {
-		FName string `json:"full_path"`
-		FKind string `json:"kind"`
+		FName string `json:"path"`
 	}
 	err = json.NewDecoder(rsp.Body).Decode(&content)
 	if nil != err {
@@ -211,9 +238,18 @@ func (c *gitlabClient) getOwner(o string) (res *owner, err error) {
 
 	res = &owner{
 		FName: content.FName,
-		FKind: content.FKind,
+		FKind: "group",
 	}
 	res.Value = res
+	return
+}
+
+func (c *gitlabClient) getOwner(o string) (res *owner, err error) {
+	res, err = c.getUser(o)
+	if ErrNotFound != err {
+		return
+	}
+	res, err = c.getGroup(o)
 	return
 }
 
