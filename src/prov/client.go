@@ -24,7 +24,7 @@ import (
 )
 
 type client struct {
-	internal clientInternal
+	api      clientApi
 	dir      string
 	keepdir  bool
 	caseins  bool
@@ -51,15 +51,15 @@ type repository struct {
 	FRemote string
 }
 
-type clientInternal interface {
+type clientApi interface {
 	getIdent() string
 	getGitCredentials() (string, string)
 	getOwner(owner string) (res *owner, err error)
 	getRepositories(owner string, kind string) (res []*repository, err error)
 }
 
-func (c *client) init(internal clientInternal) {
-	c.internal = internal
+func (c *client) init(api clientApi) {
+	c.api = api
 	c.cache = newCache(&c.lock)
 	c.cache.Value = c
 }
@@ -82,7 +82,7 @@ func (c *client) SetConfig(config []string) ([]string, error) {
 				if d, e := appdata.CacheDir(); nil == e {
 					if p, e := os.Executable(); nil == e {
 						n := strings.TrimSuffix(filepath.Base(p), ".exe")
-						v = filepath.Join(d, n, c.internal.getIdent())
+						v = filepath.Join(d, n, c.api.getIdent())
 						c.dir = v
 						c.keepdir = false
 					}
@@ -151,7 +151,7 @@ func (c *client) OpenOwner(name string) (Owner, error) {
 	}
 	c.lock.Unlock()
 
-	res, err = c.internal.getOwner(name)
+	res, err = c.api.getOwner(name)
 	if nil != err {
 		return nil, err
 	}
@@ -186,7 +186,7 @@ func (c *client) ensureRepositories(o *owner, fn func() error) error {
 	}
 	c.lock.Unlock()
 
-	repositories, err := c.internal.getRepositories(o.FName, o.FKind)
+	repositories, err := c.api.getRepositories(o.FName, o.FKind)
 	if nil != err {
 		return err
 	}
@@ -237,7 +237,7 @@ func (c *client) OpenRepository(O Owner, name string) (Repository, error) {
 		}
 		res = item.Value.(*repository)
 		if emptyRepository == res.Repository {
-			u, p := c.internal.getGitCredentials()
+			u, p := c.api.getGitCredentials()
 			r := newGitRepository(res.FRemote, u, p, c.caseins, c.fullrefs)
 			if "" != c.dir {
 				err = r.SetDirectory(filepath.Join(c.dir, o.FName, res.FName))
