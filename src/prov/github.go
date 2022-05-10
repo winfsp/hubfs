@@ -197,7 +197,7 @@ func (c *githubClient) sendrecvGql(query string) (*http.Response, error) {
 func (c *githubClient) getOwner(o string) (res *owner, err error) {
 	defer trace(o)(&err)
 
-	rsp, err := c.sendrecv(fmt.Sprintf("/users/%s", o))
+	rsp, err := c.sendrecv(fmt.Sprintf("/users/%s", url.PathEscape(o)))
 	if nil != err {
 		return nil, err
 	}
@@ -256,11 +256,11 @@ func (c *githubClient) getRepositoriesRest(owner string, kind string) (res []*re
 
 	var path string
 	if "Organization" == kind {
-		path = fmt.Sprintf("/orgs/%s/repos?type=all&per_page=100", owner)
+		path = fmt.Sprintf("/orgs/%s/repos?type=all&per_page=100", url.PathEscape(owner))
 	} else if c.login == owner {
 		path = "/user/repos?visibility=all&affiliation=owner&per_page=100"
 	} else {
-		path = fmt.Sprintf("/users/%s/repos?type=owner&per_page=100", owner)
+		path = fmt.Sprintf("/users/%s/repos?type=owner&per_page=100", url.PathEscape(owner))
 	}
 
 	res = make([]*repository, 0)

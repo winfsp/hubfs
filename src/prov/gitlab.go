@@ -194,7 +194,7 @@ func (c *gitlabClient) sendrecv(path string) (*http.Response, error) {
 func (c *gitlabClient) getUser(o string) (res *owner, err error) {
 	defer trace(o)(&err)
 
-	rsp, err := c.sendrecv(fmt.Sprintf("/users?username=%s", o))
+	rsp, err := c.sendrecv(fmt.Sprintf("/users?username=%s", url.PathEscape(o)))
 	if nil != err {
 		return nil, err
 	}
@@ -222,7 +222,7 @@ func (c *gitlabClient) getUser(o string) (res *owner, err error) {
 func (c *gitlabClient) getGroup(o string) (res *owner, err error) {
 	defer trace(o)(&err)
 
-	rsp, err := c.sendrecv(fmt.Sprintf("/groups/%s?with_projects=false", o))
+	rsp, err := c.sendrecv(fmt.Sprintf("/groups/%s?with_projects=false", url.PathEscape(o)))
 	if nil != err {
 		return nil, err
 	}
@@ -293,10 +293,10 @@ func (c *gitlabClient) getRepositories(owner string, kind string) (res []*reposi
 	var path string
 	if "group" == kind {
 		path = fmt.Sprintf("/groups/%s/projects?"+
-			"include_subgroups=true&simple=true&order_by=id&per_page=100", owner)
+			"include_subgroups=true&simple=true&order_by=id&per_page=100", url.PathEscape(owner))
 	} else {
 		path = fmt.Sprintf("/users/%s/projects?"+
-			"simple=true&order_by=id&per_page=100", owner)
+			"simple=true&order_by=id&per_page=100", url.PathEscape(owner))
 	}
 
 	res = make([]*repository, 0)
