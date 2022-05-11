@@ -208,6 +208,7 @@ jobs:
         if: runner.os == 'Windows'
         env:
           HUBFS_TOKEN: ${{ secrets.HUBFS_TOKEN }}
+          HUBFS_GL_TOKEN: ${{ secrets.HUBFS_GL_TOKEN }}
         run: |
           Set-PSDebug -Trace 1
 
@@ -221,16 +222,33 @@ jobs:
           Start-Sleep 3
           Pop-Location
 
+          Start-Process -NoNewWindow .\build\out\hubfs.exe "-auth token=$env:HUBFS_GL_TOKEN gitlab.com X:"
+          Start-Sleep 3
+          Push-Location X:\winfsp\hubfs\master
+          build/make dist
+          cd X:\winfsp\hubfs\TestTag
+          build/make dist
+          Stop-Process -Name hubfs
+          Start-Sleep 3
+          Pop-Location
+
       - name: Test HUBFS file system (Linux / macOS)
         if: runner.os == 'Linux' || runner.os == 'macOS'
         env:
           HUBFS_TOKEN: ${{ secrets.HUBFS_TOKEN }}
+          HUBFS_GL_TOKEN: ${{ secrets.HUBFS_GL_TOKEN }}
         run: |
           set -x
 
           mkdir mnt
 
           ./build/out/hubfs -auth token=$HUBFS_TOKEN github.com mnt &
+          sleep 3
+          (cd mnt/winfsp/hubfs/master && build/make dist)
+          (cd mnt/winfsp/hubfs/TestTag && build/make dist)
+          sudo umount mnt
+
+          ./build/out/hubfs -auth token=$HUBFS_GL_TOKEN gitlab.com mnt &
           sleep 3
           (cd mnt/winfsp/hubfs/master && build/make dist)
           (cd mnt/winfsp/hubfs/TestTag && build/make dist)
