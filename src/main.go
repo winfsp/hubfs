@@ -30,7 +30,6 @@ import (
 	"github.com/winfsp/cgofuse/fuse"
 	"github.com/winfsp/hubfs/fs/hubfs"
 	"github.com/winfsp/hubfs/fs/port"
-	"github.com/winfsp/hubfs/httputil"
 	"github.com/winfsp/hubfs/prov"
 	"github.com/winfsp/hubfs/util"
 )
@@ -155,7 +154,6 @@ func run() int {
 
 	debug := false
 	printver := false
-	insecure := false
 	authmeth := "full"
 	authkey := ""
 	authonly := false
@@ -178,7 +176,6 @@ func run() int {
 
 	flag.BoolVar(&debug, "d", debug, "debug output")
 	flag.BoolVar(&printver, "version", printver, "print version information")
-	flag.BoolVar(&insecure, "insecure", insecure, "skip TLS server cert verification")
 	flag.StringVar(&authmeth, "auth", "",
 		"`method` is from list below; auth tokens are stored in system keyring\n"+
 			"- force     perform interactive auth even if token present\n"+
@@ -199,6 +196,8 @@ func run() int {
 			"- rule is include (+) or exclude (-) (default: include)\n"+
 			"- rule owner/repo can use wildcards for pattern matching")
 	flag.Var(&mntopt, "o", "FUSE mount `options`\n(default: "+strings.Join(default_mntopt, ",")+")")
+
+	util.InvokeEvent("main.Flagvar", nil)
 
 	flag.Parse()
 
@@ -251,9 +250,7 @@ func run() int {
 		libtrace.Pattern = "*,github.com/winfsp/hubfs/*,github.com/winfsp/hubfs/fs/*"
 	}
 
-	if insecure {
-		httputil.DefaultTransport.TLSClientConfig.InsecureSkipVerify = true
-	}
+	util.InvokeEvent("main.Flagrun", nil)
 
 	uri, err := url.Parse(remote)
 	if nil != uri && "" == uri.Scheme {
