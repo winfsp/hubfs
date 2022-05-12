@@ -17,9 +17,9 @@
 package main
 
 import (
-	"github.com/winfsp/hubfs/pvt/prov"
+	"github.com/winfsp/hubfs/pvt"
 )
 
 func init() {
-	prov.Load()
+	pvt.Load()
 }
