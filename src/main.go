@@ -51,19 +51,6 @@ func warn(format string, a ...interface{}) {
 	fmt.Fprintf(os.Stderr, format, a...)
 }
 
-type optlist []string
-
-// String implements flag.Value.String.
-func (mntopt *optlist) String() string {
-	return ""
-}
-
-// Set implements flag.Value.Set.
-func (mntopt *optlist) Set(s string) error {
-	*mntopt = append(*mntopt, s)
-	return nil
-}
-
 func newClientWithKey(provider prov.Provider, authkey string) (
 	client prov.Client, err error) {
 	token, err := keyring.Get(MyProductName, authkey)
@@ -142,14 +129,14 @@ func mount(client prov.Client, overlay bool, prefix string, mntpnt string, confi
 }
 
 func run() int {
-	default_mntopt := optlist{}
+	default_mntopt := util.Optlist{}
 	switch runtime.GOOS {
 	case "windows":
-		default_mntopt = optlist{"uid=-1", "gid=-1", "rellinks", "FileInfoTimeout=-1"}
+		default_mntopt = util.Optlist{"uid=-1", "gid=-1", "rellinks", "FileInfoTimeout=-1"}
 	case "linux":
-		default_mntopt = optlist{"uid=-1", "gid=-1", "default_permissions"}
+		default_mntopt = util.Optlist{"uid=-1", "gid=-1", "default_permissions"}
 	case "darwin":
-		default_mntopt = optlist{"uid=-1", "gid=-1", "default_permissions", "noapplexattr"}
+		default_mntopt = util.Optlist{"uid=-1", "gid=-1", "default_permissions", "noapplexattr"}
 	}
 
 	debug := false
@@ -159,8 +146,8 @@ func run() int {
 	authonly := false
 	readonly := false
 	fullrefs := false
-	filter := optlist{}
-	mntopt := optlist{}
+	filter := util.Optlist{}
+	mntopt := util.Optlist{}
 	remote := "github.com"
 	mntpnt := ""
 	config := []string{"config.dir=:"}
