@@ -55,4 +55,5 @@ CONTRIBUTOR LIST
 ----------------
 |===
 |Bill Zissimopoulos                     |billziss at navimatics.com
+|Sơn Trần-Nguyễn                        |github at sntran.com
 |===
